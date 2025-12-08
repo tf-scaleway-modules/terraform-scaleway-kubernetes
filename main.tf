@@ -56,5 +56,5 @@ resource "scaleway_k8s_pool" "pools" {
   container_runtime   = "containerd"
   region              = lookup(each.value, "region", null)
   wait_for_pool_ready = lookup(each.value, "wait_for_pool_ready", false)
-  depends_on = [scaleway_k8s_cluster.cluster]
+  depends_on          = [scaleway_k8s_cluster.cluster]
 }
