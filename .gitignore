@@ -1,0 +1,51 @@
+# Terraform
+.terraform
+.terragrunt-cache
+*.tfstate*
+*.tfplan
+*.tfvars
+!example.tfvars
+.terraform.lock.hcl
+
+# Copies of main_providers.tf
+main_providers.tf
+
+# Except original (see related issue - https://github.com/gruntwork-io/terragrunt/issues/785)
+!terraform/common/main_providers.tf
+
+# Secrets are not allowed in general
+*.key
+*.pem
+secrets.auto.tfvars
+
+# Secrets are encrypted using git-crypt
+!secrets/*
+
+# OS X
+.history
+.DS_Store
+
+# IntelliJ
+.idea_modules
+*.iml
+*.iws
+*.ipr
+.idea/
+build/
+*/build/
+out/
+
+# VS Code
+.vscode/
+
+# Pre-commit cache
+.cache/
+
+# Temporary files
+*.tmp
+*.bak
+*~
+
+.envrc
+
+mise.local.toml

@@ -1,0 +1,31 @@
+[settings]
+auto_install = true
+
+[tools]
+pre-commit = '4.3'
+git-cliff = '2.7.0'
+age = '1.2'
+sops = '3.11'
+shfmt = '3.12'
+yamlfmt = '0.20'
+opentofu = '1.11'
+terraform-docs = '0.21.0'
+tflint = '0.56.0'
+python = '3.13'
+
+[tasks.rm-cache]
+run = 'find . -type d -name ".terramate-cache" -prune -exec rm -rf {} \;'
+
+[tasks.rm-terraform]
+run = 'find . -type d -name ".terraform" -prune -exec rm -rf {} \;'
+
+[tasks.rm-lock]
+run = 'find . -type f -name ".terraform.lock.hcl" -prune -exec rm -rf {} \;'
+
+[tasks.rm-all]
+run = '''
+find . -type d -name ".terramate-cache" -prune -exec rm -rf {} \;
+find . -type d -name ".terraform" -prune -exec rm -rf {} \;
+find . -type f -name ".terraform.lock.hcl" -prune -exec rm -rf {} \;
+find . -type f -name "terraform.tfstate*" -prune -exec rm -rf {} \;
+'''

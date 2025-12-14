@@ -1,0 +1,42 @@
+pre-commit:
+  stage: validate
+  image: ubuntu:24.04
+  rules:
+    - exists:
+        - .pre-commit-config.yaml
+      when: always
+  variables:
+    PRE_COMMIT_HOME: $CI_PROJECT_DIR/.cache/pre-commit
+    MISE_DATA_DIR: $CI_PROJECT_DIR/.cache/mise
+    MISE_CACHE_DIR: $CI_PROJECT_DIR/.cache/mise/cache
+  cache:
+    key: pre-commit-${CI_COMMIT_REF_SLUG}
+    paths:
+      - $CI_PROJECT_DIR/.cache
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates python3
+    # Install mise
+    - curl -fsSL https://mise.run | sh
+    - export PATH="$HOME/.local/bin:$PATH"
+    # Install all tools from mise.toml
+    - mise install
+    # Activate mise for current shell
+    - eval "$(mise activate bash)"
+    # Install osv-scanner (not in mise)
+    - |
+      curl -fsSL https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64 \
+        -o /usr/local/bin/osv-scanner && chmod +x /usr/local/bin/osv-scanner
+    # Create initial tag if none exist (required by git-cliff)
+    - |
+      if ! git describe --tags 2>/dev/null; then
+        git tag v0.0.0 $(git rev-list --max-parents=0 HEAD) 2>/dev/null || true
+      fi
+  script:
+    - eval "$(mise activate bash)"
+    - |
+      if [ "${SKIP_OSV_SCAN:-false}" = "true" ]; then
+        echo "Skipping OSV Scanner"
+      else
+        osv-scanner -r .
+      fi
+    - pre-commit run -a -v --show-diff-on-failure --color always

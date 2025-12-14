@@ -1,0 +1,4 @@
+include:
+  - local: '.gitlab/global.yml'
+  - local: '.gitlab/pre-commit.yml'
+  - local: '.gitlab/release.yml'
