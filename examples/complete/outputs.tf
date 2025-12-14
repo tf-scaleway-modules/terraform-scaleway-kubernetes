@@ -54,6 +54,7 @@ output "kubeconfig" {
 output "kubeconfig_host" {
   description = "Kubernetes API server host"
   value       = module.kubernetes.kubeconfig_host
+  sensitive   = true
 }
 
 ################################################################################

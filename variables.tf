@@ -188,8 +188,8 @@ variable "autoscaler_config" {
   }
 
   validation {
-    condition     = var.autoscaler_config == null || contains(["random", "most-pods", "least-waste", "priority", "price"], var.autoscaler_config.expander)
-    error_message = "Expander must be one of: random, most-pods, least-waste, priority, price."
+    condition     = var.autoscaler_config == null || contains(["random", "most_pods", "least_waste", "priority", "price"], var.autoscaler_config.expander)
+    error_message = "Expander must be one of: random, most_pods, least_waste, priority, price."
   }
 
   validation {
@@ -280,16 +280,16 @@ variable "node_pools" {
 
   validation {
     condition = alltrue([
-      for k, v in var.node_pools : v.size >= 0
+      for k, v in var.node_pools : v.size >= 1
     ])
-    error_message = "Node pool size must be non-negative."
+    error_message = "Node pool size must be at least 1."
   }
 
   validation {
     condition = alltrue([
-      for k, v in var.node_pools : v.min_size == null || v.min_size >= 0
+      for k, v in var.node_pools : v.min_size == null || v.min_size >= 1
     ])
-    error_message = "Node pool min_size must be non-negative."
+    error_message = "Node pool min_size must be at least 1."
   }
 
   validation {

@@ -14,7 +14,7 @@ module "kubernetes" {
 
   # Cluster
   name               = "minimal-cluster"
-  kubernetes_version = "1.31"
+  kubernetes_version = "1.34"
 
   # Node Pools
   node_pools = {

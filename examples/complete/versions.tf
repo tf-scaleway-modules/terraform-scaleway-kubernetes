@@ -18,5 +18,4 @@ terraform {
 }
 
 provider "scaleway" {
-  region = "fr-par"
 }

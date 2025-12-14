@@ -17,7 +17,7 @@ module "kubernetes" {
   name               = "production-cluster"
   description        = "Production Kubernetes cluster with full configuration"
   type               = "kapsule"
-  kubernetes_version = "1.31"
+  kubernetes_version = "1.34"
   cni                = "cilium"
   region             = "fr-par"
   tags               = ["env:production", "team:platform", "managed-by:terraform"]
@@ -25,8 +25,8 @@ module "kubernetes" {
   # Cluster Features
   delete_additional_resources = true
   feature_gates               = []
-  admission_plugins           = ["PodSecurityPolicy"]
-  apiserver_cert_sans         = ["api.example.com"]
+  admission_plugins           = []
+  apiserver_cert_sans         = []
 
   # Auto Upgrade Configuration
   auto_upgrade = {
@@ -41,7 +41,7 @@ module "kubernetes" {
     scale_down_delay_after_add       = "10m"
     scale_down_unneeded_time         = "10m"
     estimator                        = "binpacking"
-    expander                         = "least-waste"
+    expander                         = "least_waste"
     ignore_daemonsets_utilization    = true
     balance_similar_node_groups      = true
     expendable_pods_priority_cutoff  = -10
@@ -75,10 +75,6 @@ module "kubernetes" {
       wait_for_pool_ready    = true
       tags                   = ["pool:system", "critical:true"]
 
-      kubelet_args = {
-        "max-pods" = "110"
-      }
-
       upgrade_policy = {
         max_unavailable = 1
         max_surge       = 0
@@ -107,11 +103,11 @@ module "kubernetes" {
       }
     }
 
-    # Spot/preemptible pool for batch workloads
+    # Batch pool for batch workloads
     batch = {
       node_type              = "DEV1-L"
-      size                   = 0
-      min_size               = 0
+      size                   = 1
+      min_size               = 1
       max_size               = 20
       autoscaling            = true
       autohealing            = true
@@ -119,8 +115,8 @@ module "kubernetes" {
       zone                   = "fr-par-2"
       root_volume_size_in_gb = 50
       public_ip_disabled     = false
-      wait_for_pool_ready    = false
-      tags                   = ["pool:batch", "preemptible:true"]
+      wait_for_pool_ready    = true
+      tags                   = ["pool:batch"]
     }
   }
 }
