@@ -1,209 +1,199 @@
-# -------------------- PROJECT VARIABLES ------------------ #
+################################################################################
+# Project Configuration
+################################################################################
+
 variable "project_name" {
+  description = "Name of the Scaleway project"
   type        = string
-  description = "The name of the Project"
   default     = "default"
 }
+
 variable "organization_id" {
-  type        = string
-  description = "The unique identifier of the Organization with which the Project is associated."
-
-}
-
-# -------------------- PRIVATE NETWORK ID ------------------ #
-## This will be passed as dependency
-variable "private_network_id" {
-  description = "ID of the Scaleway VPC Private Network (format: <region>/<uuid>)"
+  description = "Scaleway organization ID"
   type        = string
 }
 
-# -------------------- CLUSTER VARIABLES ------------------ #
+################################################################################
+# Cluster Configuration
+################################################################################
 
-variable "cluster_name" {
+variable "name" {
+  description = "Name of the Kubernetes cluster"
   type        = string
-  description = "The name for the Kubernetes cluster."
-
 }
 
-variable "cluster_type" {
+variable "description" {
+  description = "Description for the Kubernetes cluster"
   type        = string
-  description = "type of Kubernetes cluster"
   default     = null
-
-
 }
 
-variable "cluster_description" {
+variable "type" {
+  description = "Type of Kubernetes cluster (kapsule, multicloud)"
   type        = string
-  description = "A description for the Kubernetes cluster."
-  default     = null
+  default     = "kapsule"
 
-
+  validation {
+    condition     = var.type == null || contains(["kapsule", "multicloud", "kapsule-dedicated-8", "kapsule-dedicated-16"], var.type)
+    error_message = "Cluster type must be one of: kapsule, multicloud, kapsule-dedicated-8, kapsule-dedicated-16."
+  }
 }
 
-variable "cluster_version" {
+variable "kubernetes_version" {
+  description = "Kubernetes version for the cluster (e.g., '1.31')"
   type        = string
-  description = "The version of the Kubernetes cluster."
-
 }
 
-variable "cluster_cni" {
+variable "cni" {
+  description = "Container Network Interface plugin (cilium, calico, weave, flannel, none)"
   type        = string
-  description = "The Container Network Interface (CNI) for the Kubernetes cluster."
+  default     = "cilium"
 
+  validation {
+    condition     = contains(["cilium", "calico", "weave", "flannel", "none"], var.cni)
+    error_message = "CNI must be one of: cilium, calico, weave, flannel, none."
+  }
 }
 
-variable "cluster_tags" {
+variable "tags" {
+  description = "Tags to apply to the Kubernetes cluster"
   type        = list(string)
-  description = "The tags associated with the Kubernetes cluster"
-  default     = null
+  default     = []
+}
 
+variable "region" {
+  description = "Scaleway region for the cluster (defaults to provider region)"
+  type        = string
+  default     = null
+}
+
+variable "private_network_id" {
+  description = "ID of the Scaleway VPC Private Network (format: region/uuid)"
+  type        = string
 }
 
 variable "delete_additional_resources" {
-  sensitive   = true
+  description = "Delete additional resources (block volumes, loadbalancers) on cluster deletion"
   type        = bool
-  description = "Delete additional resources like block volumes and loadbalancers that were created in Kubernetes on cluster deletion"
   default     = false
-
 }
 
-variable "cluster_feature_gates" {
+variable "feature_gates" {
+  description = "List of Kubernetes feature gates to enable on the cluster"
   type        = list(string)
-  description = "The list of feature gates to enable on the cluster."
-  default     = null
-
-
+  default     = []
 }
 
-variable "cluster_admission_plugins" {
+variable "admission_plugins" {
+  description = "List of Kubernetes admission plugins to enable on the cluster"
   type        = list(string)
-  description = "The list of admission plugins to enable on the cluster."
-  default     = null
-
+  default     = []
 }
 
-variable "cluster_apiserver_cert_sans" {
+variable "apiserver_cert_sans" {
+  description = "Additional Subject Alternative Names for the API server certificate"
   type        = list(string)
-  description = "Additional Subject Alternative Names for the Kubernetes API server certificate."
-  default     = null
-
+  default     = []
 }
 
-variable "cluster_region" {
-  type        = string
-  description = "(Defaults to provider region) The region in which the cluster should be created."
-  default     = null
+################################################################################
+# Auto Upgrade Configuration
+################################################################################
 
+variable "auto_upgrade" {
+  description = "Auto upgrade configuration for the cluster"
+  type = object({
+    enabled                       = bool
+    maintenance_window_start_hour = number
+    maintenance_window_day        = string
+  })
+  default = {
+    enabled                       = false
+    maintenance_window_start_hour = 3
+    maintenance_window_day        = "sunday"
+  }
 
+  validation {
+    condition     = var.auto_upgrade.maintenance_window_start_hour >= 0 && var.auto_upgrade.maintenance_window_start_hour <= 23
+    error_message = "Maintenance window start hour must be between 0 and 23."
+  }
+
+  validation {
+    condition     = contains(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "any"], var.auto_upgrade.maintenance_window_day)
+    error_message = "Maintenance window day must be one of: monday, tuesday, wednesday, thursday, friday, saturday, sunday, any."
+  }
 }
 
-variable "enable_auto_upgrade" {
-  type        = bool
-  description = "Set to true to enable Kubernetes patch version auto upgrades. ~> Important: When enabling auto upgrades, the version field take a minor version like x.y (ie 1.18)."
-  default     = false
+################################################################################
+# Autoscaler Configuration
+################################################################################
+
+variable "autoscaler_config" {
+  description = "Cluster autoscaler configuration. Set to null to disable autoscaler."
+  type = object({
+    disable_scale_down               = optional(bool, false)
+    scale_down_delay_after_add       = optional(string, "10m")
+    scale_down_unneeded_time         = optional(string, "10m")
+    estimator                        = optional(string, "binpacking")
+    expander                         = optional(string, "random")
+    ignore_daemonsets_utilization    = optional(bool, false)
+    balance_similar_node_groups      = optional(bool, false)
+    expendable_pods_priority_cutoff  = optional(number, -10)
+    scale_down_utilization_threshold = optional(number, 0.5)
+    max_graceful_termination_sec     = optional(number, 600)
+  })
+  default = null
+
+  validation {
+    condition     = var.autoscaler_config == null || contains(["binpacking", "random"], var.autoscaler_config.estimator)
+    error_message = "Estimator must be one of: binpacking, random."
+  }
+
+  validation {
+    condition     = var.autoscaler_config == null || contains(["random", "most-pods", "least-waste", "priority", "price"], var.autoscaler_config.expander)
+    error_message = "Expander must be one of: random, most-pods, least-waste, priority, price."
+  }
+
+  validation {
+    condition     = var.autoscaler_config == null || (var.autoscaler_config.scale_down_utilization_threshold >= 0 && var.autoscaler_config.scale_down_utilization_threshold <= 1)
+    error_message = "Scale down utilization threshold must be between 0 and 1."
+  }
 }
 
-variable "maintenance_window_start_hour" {
-  type        = string
-  description = "The start hour (UTC) of the 2-hour auto upgrade maintenance window (0 to 23)."
-  default     = 3
-
-}
-
-variable "maintenance_window_day" {
-  type        = string
-  description = "The day of the auto upgrade maintenance window (monday to sunday, or any)."
-  default     = "sunday"
-
-}
-
-variable "enable_autoscaler" {
-  type        = bool
-  description = "To enable cluster autoscaler"
-  default     = false
-}
-
-variable "disable_scale_down" {
-  type        = bool
-  description = "Disables the scale down feature of the autoscaler."
-  default     = false
-}
-
-variable "scale_down_delay_after_add" {
-  type        = string
-  description = "How long after scale up that scale down evaluation resumes."
-  default     = "10m"
-
-
-}
-
-variable "scale_down_unneeded_time" {
-  type        = string
-  description = "How long a node should be unneeded before it is eligible for scale down."
-  default     = "10m"
-
-}
-
-variable "estimator" {
-  type        = string
-  description = "Type of resource estimator to be used in scale up."
-  default     = "binpacking"
-
-}
-
-variable "expander" {
-  type        = string
-  description = "Type of node group expander to be used in scale up."
-  default     = "random"
-
-}
-
-variable "ignore_daemonsets_utilization" {
-  type        = bool
-  description = "Ignore DaemonSet pods when calculating resource utilization for scaling down."
-  default     = false
-}
-
-variable "balance_similar_node_groups" {
-  type        = bool
-  description = "Detect similar node groups and balance the number of nodes between them."
-  default     = false
-}
-
-variable "expendable_pods_priority_cutoff" {
-  type        = number
-  description = "Pods with priority below cutoff will be expendable. They can be killed without any consideration during scale down and they don't cause scale up. Pods with null priority (PodPriority disabled) are non expendable."
-  default     = -10
-}
-
-variable "scale_down_utilization_threshold" {
-  type        = number
-  description = "Node utilization level, defined as sum of requested resources divided by capacity, below which a node can be considered for scale down."
-  default     = 0.5
-}
-
-variable "max_graceful_termination_sec" {
-  type        = number
-  description = "Maximum number of seconds the cluster autoscaler waits for pod termination when trying to scale down a node."
-  default     = 600
-}
-
-#######################################################################
-# Node pools
+################################################################################
+# Node Pools Configuration
+################################################################################
 
 variable "node_pools" {
-  description = "Node pools configuration for Kubernetes cluster."
+  description = "Map of node pool configurations"
   type = map(object({
-    node_type           = string
-    size                = number
-    min_size            = number
-    max_size            = number
-    autoscaling         = bool
-    autohealing         = bool
-    wait_for_pool_ready = bool
-    container_runtime   = string
-    tags                = list(string)
+    node_type              = string
+    size                   = number
+    min_size               = optional(number)
+    max_size               = optional(number)
+    autoscaling            = optional(bool, false)
+    autohealing            = optional(bool, true)
+    container_runtime      = optional(string, "containerd")
+    tags                   = optional(list(string), [])
+    placement_group_id     = optional(string)
+    zone                   = optional(string)
+    root_volume_type       = optional(string)
+    root_volume_size_in_gb = optional(number)
+    wait_for_pool_ready    = optional(bool, true)
+    upgrade_policy = optional(object({
+      max_unavailable = optional(number, 1)
+      max_surge       = optional(number, 0)
+    }))
   }))
   default = {}
+
+  validation {
+    condition     = alltrue([for k, v in var.node_pools : v.container_runtime == null || contains(["containerd", "crio", "docker"], v.container_runtime)])
+    error_message = "Container runtime must be one of: containerd, crio, docker."
+  }
+
+  validation {
+    condition     = alltrue([for k, v in var.node_pools : v.root_volume_type == null || contains(["l_ssd", "b_ssd"], v.root_volume_type)])
+    error_message = "Root volume type must be one of: l_ssd, b_ssd."
+  }
 }

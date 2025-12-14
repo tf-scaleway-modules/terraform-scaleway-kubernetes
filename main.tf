@@ -1,55 +1,80 @@
-resource "scaleway_k8s_cluster" "cluster" {
-  name                        = var.cluster_name
-  type                        = var.cluster_type
-  description                 = var.cluster_description
-  version                     = var.cluster_version
-  cni                         = var.cluster_cni
-  tags                        = var.cluster_tags
+################################################################################
+# Kubernetes Cluster
+################################################################################
+
+resource "scaleway_k8s_cluster" "this" {
+  name        = var.name
+  description = var.description
+  type        = var.type
+  version     = var.kubernetes_version
+  cni         = var.cni
+  tags        = var.tags
+
+  region     = var.region
+  project_id = data.scaleway_account_project.this.id
+
   private_network_id          = var.private_network_id
   delete_additional_resources = var.delete_additional_resources
-  feature_gates               = var.cluster_feature_gates
-  admission_plugins           = var.cluster_admission_plugins
-  apiserver_cert_sans         = var.cluster_apiserver_cert_sans
-  region                      = var.cluster_region
-  project_id                  = data.scaleway_account_project.project.id
+
+  feature_gates       = var.feature_gates
+  admission_plugins   = var.admission_plugins
+  apiserver_cert_sans = var.apiserver_cert_sans
+
   auto_upgrade {
-    enable                        = var.enable_auto_upgrade
-    maintenance_window_start_hour = var.maintenance_window_start_hour
-    maintenance_window_day        = var.maintenance_window_day
+    enable                        = var.auto_upgrade.enabled
+    maintenance_window_start_hour = var.auto_upgrade.maintenance_window_start_hour
+    maintenance_window_day        = var.auto_upgrade.maintenance_window_day
   }
 
   dynamic "autoscaler_config" {
-    for_each = var.enable_autoscaler == true ? [1] : []
+    for_each = var.autoscaler_config != null ? [var.autoscaler_config] : []
 
     content {
-      disable_scale_down               = var.disable_scale_down
-      scale_down_delay_after_add       = var.scale_down_delay_after_add
-      estimator                        = var.estimator
-      expander                         = var.expander
-      ignore_daemonsets_utilization    = var.ignore_daemonsets_utilization
-      balance_similar_node_groups      = var.balance_similar_node_groups
-      expendable_pods_priority_cutoff  = var.expendable_pods_priority_cutoff
-      scale_down_utilization_threshold = var.scale_down_utilization_threshold
-      max_graceful_termination_sec     = var.max_graceful_termination_sec
+      disable_scale_down               = autoscaler_config.value.disable_scale_down
+      scale_down_delay_after_add       = autoscaler_config.value.scale_down_delay_after_add
+      scale_down_unneeded_time         = autoscaler_config.value.scale_down_unneeded_time
+      estimator                        = autoscaler_config.value.estimator
+      expander                         = autoscaler_config.value.expander
+      ignore_daemonsets_utilization    = autoscaler_config.value.ignore_daemonsets_utilization
+      balance_similar_node_groups      = autoscaler_config.value.balance_similar_node_groups
+      expendable_pods_priority_cutoff  = autoscaler_config.value.expendable_pods_priority_cutoff
+      scale_down_utilization_threshold = autoscaler_config.value.scale_down_utilization_threshold
+      max_graceful_termination_sec     = autoscaler_config.value.max_graceful_termination_sec
     }
   }
 }
-resource "scaleway_k8s_pool" "pools" {
+
+################################################################################
+# Node Pools
+################################################################################
+
+resource "scaleway_k8s_pool" "this" {
   for_each = var.node_pools
 
-  cluster_id = scaleway_k8s_cluster.cluster.id
+  cluster_id = scaleway_k8s_cluster.this.id
 
-  name                = each.key
-  node_type           = each.value.node_type
-  size                = each.value.size
-  min_size            = lookup(each.value, "min_size", each.value.size)
-  max_size            = lookup(each.value, "max_size", each.value.size)
-  tags                = lookup(each.value, "tags", each.value.tags)
-  placement_group_id  = lookup(each.value, "placement_group_id", null)
-  autoscaling         = lookup(each.value, "autoscaling", false)
-  autohealing         = lookup(each.value, "autohealing", false)
-  container_runtime   = lookup(each.value, "container_runtime", "containerd")
-  region              = lookup(each.value, "region", null)
-  wait_for_pool_ready = lookup(each.value, "wait_for_pool_ready", false)
-  depends_on          = [scaleway_k8s_cluster.cluster]
+  name              = each.key
+  node_type         = each.value.node_type
+  size              = each.value.size
+  min_size          = each.value.min_size
+  max_size          = each.value.max_size
+  autoscaling       = each.value.autoscaling
+  autohealing       = each.value.autohealing
+  container_runtime = each.value.container_runtime
+  tags              = each.value.tags
+
+  placement_group_id     = each.value.placement_group_id
+  zone                   = each.value.zone
+  root_volume_type       = each.value.root_volume_type
+  root_volume_size_in_gb = each.value.root_volume_size_in_gb
+  wait_for_pool_ready    = each.value.wait_for_pool_ready
+
+  dynamic "upgrade_policy" {
+    for_each = each.value.upgrade_policy != null ? [each.value.upgrade_policy] : []
+
+    content {
+      max_unavailable = upgrade_policy.value.max_unavailable
+      max_surge       = upgrade_policy.value.max_surge
+    }
+  }
 }

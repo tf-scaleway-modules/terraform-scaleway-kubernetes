@@ -15,7 +15,8 @@ A Terraform module for creating and managing **Scaleway Kapsule** Kubernetes clu
 - Auto-upgrade with maintenance window scheduling
 - VPC Private Network integration
 - Support for feature gates and admission plugins
-- Configurable container runtime (containerd)
+- Node pool upgrade policies
+- Configurable container runtime (containerd, crio, docker)
 
 ## Usage Examples
 
@@ -28,27 +29,78 @@ Comprehensive examples are available in the [`examples/`](examples/) directory:
 
 ```hcl
 module "kubernetes" {
-  source = "path/to/scaleway-kubernetes"
+  source = "git::https://gitlab.com/leminnov/terraform/modules/scaleway-kubernetes.git?ref=v1.0.0"
 
-  organization_id    = "your-organization-id"
+  organization_id    = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
   project_name       = "my-project"
   private_network_id = "fr-par/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 
-  cluster_name    = "my-cluster"
-  cluster_version = "1.31"
-  cluster_cni     = "cilium"
+  name               = "my-cluster"
+  kubernetes_version = "1.31"
+  cni                = "cilium"
 
   node_pools = {
     default = {
-      node_type           = "DEV1-M"
-      size                = 2
-      min_size            = 1
-      max_size            = 5
-      autoscaling         = true
-      autohealing         = true
-      wait_for_pool_ready = true
-      container_runtime   = "containerd"
-      tags                = ["env:production"]
+      node_type   = "DEV1-M"
+      size        = 2
+      min_size    = 1
+      max_size    = 5
+      autoscaling = true
+      autohealing = true
+    }
+  }
+}
+```
+
+### With Autoscaler Configuration
+
+```hcl
+module "kubernetes" {
+  source = "git::https://gitlab.com/leminnov/terraform/modules/scaleway-kubernetes.git?ref=v1.0.0"
+
+  organization_id    = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  project_name       = "production"
+  private_network_id = "fr-par/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+  name               = "production-cluster"
+  kubernetes_version = "1.31"
+  cni                = "cilium"
+  tags               = ["env:production", "team:platform"]
+
+  auto_upgrade = {
+    enabled                       = true
+    maintenance_window_start_hour = 3
+    maintenance_window_day        = "sunday"
+  }
+
+  autoscaler_config = {
+    scale_down_delay_after_add       = "10m"
+    scale_down_unneeded_time         = "10m"
+    scale_down_utilization_threshold = 0.5
+  }
+
+  node_pools = {
+    system = {
+      node_type   = "PRO2-S"
+      size        = 3
+      min_size    = 2
+      max_size    = 5
+      autoscaling = true
+      autohealing = true
+      tags        = ["pool:system"]
+    }
+    workers = {
+      node_type   = "PRO2-M"
+      size        = 2
+      min_size    = 1
+      max_size    = 10
+      autoscaling = true
+      autohealing = true
+      tags        = ["pool:workers"]
+      upgrade_policy = {
+        max_unavailable = 1
+        max_surge       = 2
+      }
     }
   }
 }
@@ -71,10 +123,10 @@ This module is provided "as is" without warranty of any kind, express or implied
 [apache]: https://opensource.org/licenses/Apache-2.0
 [apache-shield]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
 
-[terraform-badge]: https://img.shields.io/badge/Terraform-%3E%3D0.13-623CE4
+[terraform-badge]: https://img.shields.io/badge/Terraform-%3E%3D1.10-623CE4
 [terraform-url]: https://www.terraform.io
 
-[scaleway-badge]: https://img.shields.io/badge/Scaleway%20Provider-2.64-4f0599
+[scaleway-badge]: https://img.shields.io/badge/Scaleway%20Provider-~%3E2.64-4f0599
 [scaleway-url]: https://registry.terraform.io/providers/scaleway/scaleway/
 
 [release-badge]: https://img.shields.io/gitlab/v/release/leminnov/terraform/modules/scaleway-kubernetes?include_prereleases&sort=semver
