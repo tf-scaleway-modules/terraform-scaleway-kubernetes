@@ -46,8 +46,8 @@ output "wildcard_dns" {
 ################################################################################
 
 output "kubeconfig" {
-  description = "Kubeconfig for the cluster"
-  value       = module.kubernetes.kubeconfig_raw
+  description = "Kubeconfig for the cluster (YAML)"
+  value       = module.kubernetes.kubeconfig_file
   sensitive   = true
 }
 
@@ -68,4 +68,20 @@ output "node_pools" {
 output "node_pool_ids" {
   description = "Map of node pool names to IDs"
   value       = module.kubernetes.node_pool_ids
+}
+
+################################################################################
+# Provider Configuration Outputs
+################################################################################
+
+output "kubernetes_provider_config" {
+  description = "Configuration for Kubernetes provider"
+  value       = module.kubernetes.kubernetes_provider_config
+  sensitive   = true
+}
+
+output "helm_provider_config" {
+  description = "Configuration for Helm provider"
+  value       = module.kubernetes.helm_provider_config
+  sensitive   = true
 }

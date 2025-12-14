@@ -15,6 +15,6 @@ output "apiserver_url" {
 
 output "kubeconfig" {
   description = "Kubeconfig for the cluster"
-  value       = module.kubernetes.kubeconfig_raw
+  value       = module.kubernetes.kubeconfig_file
   sensitive   = true
 }

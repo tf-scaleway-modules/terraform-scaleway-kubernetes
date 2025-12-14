@@ -10,6 +10,6 @@ variable "project_name" {
 }
 
 variable "private_network_id" {
-  description = "ID of the Scaleway VPC Private Network"
+  description = "ID of the Scaleway VPC Private Network (format: region/uuid)"
   type        = string
 }
