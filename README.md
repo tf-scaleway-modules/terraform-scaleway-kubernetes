@@ -30,7 +30,7 @@ A production-ready Terraform module for creating and managing **Scaleway Kapsule
 
 | Name | Version |
 |------|---------|
-| <a name="provider_scaleway"></a> [scaleway](#provider\_scaleway) | 2.65.1 |
+| <a name="provider_scaleway"></a> [scaleway](#provider\_scaleway) | ~> 2.64 |
 
 ## Modules
 
