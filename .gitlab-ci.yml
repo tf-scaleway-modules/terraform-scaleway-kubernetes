@@ -1,20 +1,4 @@
-variables:
-  TOOLBOX_PYTHON_IMAGE: "registry.gitlab.com/${GITLAB_GROUP_PATH}/containers/toolbox:v5.0.0"
-
-pre-commit:
-  image: $TOOLBOX_PYTHON_IMAGE
-  rules:
-  - when: always
-  # Run the job only when the file `.pre-commit-config.yaml` exist in the repo
-  - exists:
-      - .pre-commit-config.yaml
-  variables:
-    PRE_COMMIT_HOME: $CI_PROJECT_DIR/.cache/pre-commit
-  # Enable Caching for pre-commit
-  cache:
-    key: pre-commit
-    paths:
-      - $CI_PROJECT_DIR/.cache
-  script:
-    # Trigger pre-commit checks
-    - pre-commit run -a
+include:
+  - local: '.gitlab/global.yml'
+  - local: '.gitlab/pre-commit.yml'
+  - local: '.gitlab/release.yml'

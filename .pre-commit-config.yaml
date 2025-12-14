@@ -2,29 +2,16 @@ default_install_hook_types:
     - pre-commit
     - pre-merge-commit
     - pre-push
+    - prepare-commit-msg
+    - commit-msg
     - post-checkout
     - post-commit
     - post-merge
+    - post-rewrite
 
 repos:
-- repo: https://github.com/antonbabenko/pre-commit-terraform
-  rev: v1.77.0
-  hooks:
-    - id: terraform_fmt
-      name: "Terraform FMT"
-    # - id: terraform_tflint
-    #   name: "Terraform Lint"
-    # # TODO disabled temp as impossible to ignore the terraform_docs error of variable only in specific branchs
-    # - id: terraform_docs
-    #   name: "Terraform Docs"
-    # - id: terraform_checkov
-    #   name: "Terraform Checkov"
-    #   args:
-    #   - --args=--quiet
-    #   - --args=--skip-check CKV_AWS_117
-
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.3.0  # this is optional, use `pre-commit autoupdate` to get the latest rev!
+    rev: v6.0.0  # this is optional, use `pre-commit autoupdate` to get the latest rev!
     hooks:
     # Verify YAML syntax
     -   id: check-yaml
@@ -32,6 +19,8 @@ repos:
         description: "Verify YAML syntax"
         args:
         - --allow-multiple-documents
+    - id: check-json
+    - id: detect-private-key
     # Trims trailing whitespaces
     -   id: trailing-whitespace
         name: "Trailing Whitespaces"
@@ -40,35 +29,30 @@ repos:
     -   id: no-commit-to-branch
         name: "No Commits to Master"
         description: "Protect Master from direct checkins"
-        stages: [commit]
         args:
         - --branch=master
-        - --branch=main
     # Check for files that contain merge conflict strings.
     -   id: check-merge-conflict
         name: "MergeRequests conflicts"
         description: "Check for files that contain merge conflict strings."
         args:
         - --assume-in-merge
-    # Detest private key in the source code
-    - id: detect-private-key
+    - id: end-of-file-fixer
+      exclude: ^CHANGELOG\.md$
 
+-   repo: https://github.com/antonbabenko/pre-commit-terraform.git
+    rev: v1.103.0
+    hooks:
+    - id: terraform_fmt
+    - id: terraform_docs
+    - id: terraform_tflint
+
+# Run git-cliff to generate CHANGELOG for all tagged releases
 -   repo: local
     hooks:
-    -   id: gitlab-script
-        name: Update of Gitlab Group Path
-        entry: ./.pre-commit-script.sh
-        language: script
-        # stages: [commit, merge-commit, push, prepare-commit-msg, commit-msg, post-checkout, post-commit, post-merge, post-rewrite, manual]
-        stages: [commit, merge-commit, push, post-checkout, post-commit, post-merge]
-
-# //TODO to be activate and resolving all checkov checks
-# -   repo: local
-# hooks:
-#     -   id: checkov
-#         name: "Checkov"
-#         language: python
-#         entry: checkov -d ./
-#         pass_filenames: false
-#         always_run: false
-#         require_serial: true
+    - id: git-cliff
+      name: Generate CHANGELOG
+      language: system
+      entry: git-cliff --config .cliff.toml --output CHANGELOG.md
+      pass_filenames: false
+      always_run: true

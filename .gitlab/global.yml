@@ -1,0 +1,9 @@
+variables:
+  # Version detection from git tags
+  GIT_DEPTH: 0  # Full history for proper tag detection
+  MISE_VERSION: "2024.12.14"
+  OSV_SCANNER_VERSION: "1.9.1"
+
+stages:
+  - validate
+  - release

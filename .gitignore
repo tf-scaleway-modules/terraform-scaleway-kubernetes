@@ -1,8 +1,11 @@
 # Terraform
-.terraform*
-terraform.*
+.terraform
 .terragrunt-cache
 *.tfstate*
+*.tfplan
+*.tfvars
+!example.tfvars
+.terraform.lock.hcl
 
 # Copies of main_providers.tf
 main_providers.tf
@@ -13,6 +16,7 @@ main_providers.tf
 # Secrets are not allowed in general
 *.key
 *.pem
+secrets.auto.tfvars
 
 # Secrets are encrypted using git-crypt
 !secrets/*
@@ -31,5 +35,17 @@ build/
 */build/
 out/
 
+# VS Code
+.vscode/
+
+# Pre-commit cache
+.cache/
+
+# Temporary files
+*.tmp
+*.bak
+*~
+
 .envrc
-terragrunt.hcl
+
+mise.local.toml

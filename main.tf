@@ -1,8 +1,3 @@
-
-data "scaleway_account_project" "project" {
-  name            = var.project_name
-  organization_id = var.organization_id
-}
 resource "scaleway_k8s_cluster" "cluster" {
   name                        = var.cluster_name
   type                        = var.cluster_type
