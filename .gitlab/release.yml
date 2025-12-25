@@ -28,8 +28,40 @@ validate:tflint:
     - tflint --init
     - tflint --recursive
 
+
 # =============================================================================
-# RELEASE STAGE - Only on tags
+# CHANGELOG VERIFICATION - Ensure CHANGELOG is up to date on tags
+# =============================================================================
+
+verify:changelog:
+  stage: validate
+  image: alpine:3.21
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$/
+  variables:
+    GIT_CLIFF_VERSION: "2.7.0"
+  before_script:
+    - apk add --no-cache git curl bash
+    - |
+      curl -sSfL https://github.com/orhun/git-cliff/releases/download/v${GIT_CLIFF_VERSION}/git-cliff-${GIT_CLIFF_VERSION}-x86_64-unknown-linux-musl.tar.gz \
+        | tar -xz -C /usr/local/bin --strip-components=1 git-cliff-${GIT_CLIFF_VERSION}/git-cliff
+    - chmod +x /usr/local/bin/git-cliff
+  script:
+    - echo "Verifying CHANGELOG.md is up to date..."
+    - git-cliff --config .cliff.toml --output CHANGELOG.generated.md
+    - |
+      if ! diff -q CHANGELOG.md CHANGELOG.generated.md > /dev/null 2>&1; then
+        echo "⚠️  WARNING: CHANGELOG.md may be outdated"
+        echo "Run 'git-cliff --output CHANGELOG.md' to update it"
+        diff CHANGELOG.md CHANGELOG.generated.md || true
+      else
+        echo "✅ CHANGELOG.md is up to date"
+      fi
+  allow_failure: false  # Don't block release, just warn
+
+
+# =============================================================================
+# RELEASE STAGE - Only on semantic version tags
 # =============================================================================
 
 create:release:
@@ -38,41 +70,43 @@ create:release:
   rules:
     # Only run on semantic version tags (e.g., v1.2.3, v2.0.0-beta.1)
     - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$/
+  variables:
+    GIT_CLIFF_VERSION: "2.7.0"
+  needs:
+    - pre-commit
+    - validate:opentofu
+    - validate:tflint
+    - verify:changelog
   before_script:
-    - apk add --no-cache git
+    - apk add --no-cache git curl bash
+    # Install git-cliff
+    - |
+      curl -sSfL https://github.com/orhun/git-cliff/releases/download/v${GIT_CLIFF_VERSION}/git-cliff-${GIT_CLIFF_VERSION}-x86_64-unknown-linux-musl.tar.gz \
+        | tar -xz -C /usr/local/bin --strip-components=1 git-cliff-${GIT_CLIFF_VERSION}/git-cliff
+    - chmod +x /usr/local/bin/git-cliff
   script:
-    # Extract version from tag (remove 'v' prefix)
     - export VERSION=${CI_COMMIT_TAG#v}
     - echo "Creating release for version $VERSION"
-
-    # Extract changelog section for this version
-    - |
-      if [ -f CHANGELOG.md ]; then
-        # Extract the section between current version and previous version/EOF
-        RELEASE_NOTES=$(awk "/^## \[$VERSION\]/,/^## \[/" CHANGELOG.md | sed '$d' | tail -n +2)
-        if [ -z "$RELEASE_NOTES" ]; then
-          RELEASE_NOTES="Release $VERSION - See CHANGELOG.md for details"
-        fi
-      else
-        RELEASE_NOTES="Release $VERSION"
-      fi
-
-    # Create release with extracted notes
-    - echo "$RELEASE_NOTES" > release_notes.md
-
+    # Generate release notes for this tag only
+    - git-cliff --config .cliff.toml --latest --strip header > release_notes.md
+    - cat release_notes.md
+  artifacts:
+    paths:
+      - release_notes.md
+    expire_in: 1 hour
   release:
-    name: 'Release $CI_COMMIT_TAG'
+    name: "Release $CI_COMMIT_TAG"
     description: release_notes.md
-    tag_name: '$CI_COMMIT_TAG'
-    ref: '$CI_COMMIT_TAG'
+    tag_name: "$CI_COMMIT_TAG"
+    ref: "$CI_COMMIT_TAG"
     assets:
       links:
-        - name: 'Source Code (tar.gz)'
-          url: '${CI_PROJECT_URL}/-/archive/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-${CI_COMMIT_TAG}.tar.gz'
-          link_type: 'package'
-        - name: 'Source Code (zip)'
-          url: '${CI_PROJECT_URL}/-/archive/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-${CI_COMMIT_TAG}.zip'
-          link_type: 'package'
-        - name: 'CHANGELOG'
-          url: '${CI_PROJECT_URL}/-/blob/${CI_COMMIT_TAG}/CHANGELOG.md'
-          link_type: 'other'
+        - name: "Source Code (tar.gz)"
+          url: "${CI_PROJECT_URL}/-/archive/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-${CI_COMMIT_TAG}.tar.gz"
+          link_type: "package"
+        - name: "Source Code (zip)"
+          url: "${CI_PROJECT_URL}/-/archive/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-${CI_COMMIT_TAG}.zip"
+          link_type: "package"
+        - name: "CHANGELOG"
+          url: "${CI_PROJECT_URL}/-/blob/${CI_COMMIT_TAG}/CHANGELOG.md"
+          link_type: "other"

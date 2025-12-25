@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+
+permissions:
+  contents: write
+
+jobs:
+  # =============================================================================
+  # VALIDATION - Run validation checks on release tags
+  # =============================================================================
+  validate-opentofu:
+    name: OpenTofu Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: "1.11.0"
+
+      - name: Cache Terraform plugins
+        uses: actions/cache@v4
+        with:
+          path: .terraform
+          key: terraform-${{ runner.os }}-${{ hashFiles('**/*.tf') }}
+
+      - name: OpenTofu Init
+        run: tofu init -backend=false
+
+      - name: OpenTofu Validate
+        run: tofu validate
+
+      - name: OpenTofu Format Check
+        run: tofu fmt -check -recursive
+
+  validate-tflint:
+    name: TFLint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: "v0.56.0"
+
+      - name: TFLint Init
+        run: tflint --init
+
+      - name: TFLint
+        run: tflint --recursive
+
+  # =============================================================================
+  # CHANGELOG VERIFICATION - Warn if CHANGELOG is outdated
+  # =============================================================================
+  verify-changelog:
+    name: Verify CHANGELOG
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate and verify CHANGELOG
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: .cliff.toml
+          args: --output CHANGELOG.generated.md
+
+      - name: Check CHANGELOG diff
+        run: |
+          echo "Verifying CHANGELOG.md is up to date..."
+          if ! diff -q CHANGELOG.md CHANGELOG.generated.md > /dev/null 2>&1; then
+            echo "::warning::CHANGELOG.md may be outdated. Run 'git-cliff --output CHANGELOG.md' to update it"
+            diff CHANGELOG.md CHANGELOG.generated.md || true
+          else
+            echo "✅ CHANGELOG.md is up to date"
+          fi
+        continue-on-error: false
+
+  # =============================================================================
+  # CREATE RELEASE - Generate release with changelog
+  # =============================================================================
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [validate-opentofu, validate-tflint, verify-changelog]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Creating release for version $VERSION"
+
+      - name: Generate release notes
+        id: changelog
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: .cliff.toml
+          args: --latest --strip header
+        env:
+          OUTPUT: RELEASE_NOTES.md
+
+      - name: Show release notes
+        run: cat RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Release ${{ github.ref_name }}"
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: false
+          files: |
+            CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

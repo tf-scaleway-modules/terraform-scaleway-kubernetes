@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: ["*"]
+    tags-ignore:
+      - "v*"
+  pull_request:
+    branches: [main, develop]
+
+env:
+  GIT_CLIFF_VERSION: "2.7.0"
+  OSV_SCANNER_VERSION: "1.9.1"
+
+jobs:
+  # =============================================================================
+  # PRE-COMMIT - Runs all pre-commit hooks with mise tools
+  # =============================================================================
+  pre-commit:
+    name: Pre-commit
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Cache pre-commit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            pre-commit-${{ runner.os }}-
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+        with:
+          install: true
+          cache: true
+
+      - name: Create initial tag if needed
+        run: |
+          if ! git describe --tags 2>/dev/null; then
+            git tag v0.0.0 $(git rev-list --max-parents=0 HEAD) 2>/dev/null || true
+          fi
+
+      - name: Run pre-commit
+        run: pre-commit run -a -v --show-diff-on-failure --color always
+
+  # =============================================================================
+  # OSV SCANNER - Security vulnerability scanning
+  # =============================================================================
+  osv-scanner:
+    name: OSV Scanner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install OSV Scanner
+        run: |
+          curl -fsSL "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64" \
+            -o osv-scanner
+          chmod +x osv-scanner
+          sudo mv osv-scanner /usr/local/bin/
+
+      - name: Run OSV Scanner
+        run: osv-scanner -r .
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
+
+  # =============================================================================
+  # OPENTOFU VALIDATION
+  # =============================================================================
+  validate-opentofu:
+    name: OpenTofu Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: "1.11.0"
+
+      - name: Cache Terraform plugins
+        uses: actions/cache@v4
+        with:
+          path: .terraform
+          key: terraform-${{ runner.os }}-${{ hashFiles('**/*.tf') }}
+          restore-keys: |
+            terraform-${{ runner.os }}-
+
+      - name: OpenTofu Init
+        run: tofu init -backend=false
+
+      - name: OpenTofu Validate
+        run: tofu validate
+
+      - name: OpenTofu Format Check
+        run: tofu fmt -check -recursive
+
+  # =============================================================================
+  # TFLINT VALIDATION
+  # =============================================================================
+  validate-tflint:
+    name: TFLint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: "v0.56.0"
+
+      - name: Cache TFLint plugins
+        uses: actions/cache@v4
+        with:
+          path: ~/.tflint.d/plugins
+          key: tflint-${{ runner.os }}-${{ hashFiles('.tflint.hcl') }}
+          restore-keys: |
+            tflint-${{ runner.os }}-
+
+      - name: TFLint Init
+        run: tflint --init
+
+      - name: TFLint
+        run: tflint --recursive

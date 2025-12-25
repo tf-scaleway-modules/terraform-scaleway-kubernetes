@@ -29,3 +29,9 @@ find . -type d -name ".terraform" -prune -exec rm -rf {} \;
 find . -type f -name ".terraform.lock.hcl" -prune -exec rm -rf {} \;
 find . -type f -name "terraform.tfstate*" -prune -exec rm -rf {} \;
 '''
+
+[tasks.changelog]
+description = "Update CHANGELOG.md (fetches all tags first)"
+run = '''
+git-cliff --config .cliff.toml --output CHANGELOG.md
+'''
