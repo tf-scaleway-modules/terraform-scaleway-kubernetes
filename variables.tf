@@ -2,14 +2,10 @@
 # Project Configuration
 ################################################################################
 
-variable "organization_id" {
-  description = "Scaleway organization ID"
+variable "organization_name" {
+  description = "Scaleway organization name"
   type        = string
-
-  validation {
-    condition     = can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", var.organization_id))
-    error_message = "Organization ID must be a valid UUID."
-  }
+  default     = "default"
 }
 
 variable "project_name" {
