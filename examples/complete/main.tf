@@ -117,6 +117,12 @@ module "kubernetes" {
       public_ip_disabled     = false
       wait_for_pool_ready    = true
       tags                   = ["pool:batch"]
+
+      # Kubernetes labels/taints reconciled on every node of the pool
+      labels = { "workload" = "batch" }
+      taints = [
+        { key = "workload", value = "batch", effect = "NoSchedule" }
+      ]
     }
   }
 }
@@ -133,7 +139,7 @@ provider "kubernetes" {
 
 # Note: Helm provider configuration should be in a separate file or use the kubernetes provider
 # provider "helm" {
-#   kubernetes {
+#   kubernetes = {
 #     host                   = module.kubernetes.kubeconfig_host
 #     cluster_ca_certificate = base64decode(module.kubernetes.kubeconfig_cluster_ca_certificate)
 #     token                  = module.kubernetes.kubeconfig_token
