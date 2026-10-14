@@ -162,6 +162,12 @@ variable "auto_upgrade" {
   }
 }
 
+variable "upgrade_pools" {
+  description = "Upgrade node pools together with the cluster (provider default: true). Set to false to upgrade each pool separately via node_pools[*].version."
+  type        = bool
+  default     = null
+}
+
 ################################################################################
 # Autoscaler Configuration
 ################################################################################
@@ -179,6 +185,8 @@ variable "autoscaler_config" {
     expendable_pods_priority_cutoff  = optional(number, -10)
     scale_down_utilization_threshold = optional(number, 0.5)
     max_graceful_termination_sec     = optional(number, 600)
+    skip_nodes_with_local_storage    = optional(bool)
+    log_level                        = optional(number) # 0 (least verbose) to 4
   })
   default = null
 
@@ -195,6 +203,11 @@ variable "autoscaler_config" {
   validation {
     condition     = var.autoscaler_config == null || (var.autoscaler_config.scale_down_utilization_threshold >= 0 && var.autoscaler_config.scale_down_utilization_threshold <= 1)
     error_message = "Scale down utilization threshold must be between 0 and 1."
+  }
+
+  validation {
+    condition     = var.autoscaler_config == null || var.autoscaler_config.log_level == null || (var.autoscaler_config.log_level >= 0 && var.autoscaler_config.log_level <= 4)
+    error_message = "Autoscaler log_level must be between 0 and 4."
   }
 }
 
@@ -241,6 +254,20 @@ variable "node_pools" {
     # Runtime
     container_runtime = optional(string, "containerd")
     kubelet_args      = optional(map(string), {})
+    user_data         = optional(map(string), {}) # key => content ("cloud-init" key is reserved)
+
+    # Kubernetes node metadata (taints: reconciled; startup_taints: applied at node creation only)
+    labels = optional(map(string), {})
+    taints = optional(list(object({
+      key    = string
+      value  = string
+      effect = string
+    })), [])
+    startup_taints = optional(list(object({
+      key    = string
+      value  = string
+      effect = string
+    })), [])
 
     # Placement
     placement_group_id = optional(string)
@@ -259,6 +286,7 @@ variable "node_pools" {
 
     # Lifecycle
     wait_for_pool_ready = optional(bool, true)
+    version             = optional(string) # only honored when upgrade_pools = false
     upgrade_policy = optional(object({
       max_unavailable = optional(number, 1)
       max_surge       = optional(number, 0)
@@ -332,5 +360,14 @@ variable "node_pools" {
       for k, v in var.node_pools : v.zone == null || can(regex("^[a-z]{2}-[a-z]{3}-[1-3]$", v.zone))
     ])
     error_message = "Zone must be in format 'region-az' (e.g., 'fr-par-1', 'nl-ams-2')."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for k, v in var.node_pools : [
+        for t in concat(v.taints, v.startup_taints) : contains(["NoSchedule", "PreferNoSchedule", "NoExecute"], t.effect)
+      ]
+    ]))
+    error_message = "Taint effect must be one of: NoSchedule, PreferNoSchedule, NoExecute."
   }
 }

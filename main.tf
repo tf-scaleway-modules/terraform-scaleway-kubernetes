@@ -26,6 +26,8 @@ resource "scaleway_k8s_cluster" "this" {
     maintenance_window_day        = var.auto_upgrade.maintenance_window_day
   }
 
+  upgrade_pools = var.upgrade_pools
+
   dynamic "autoscaler_config" {
     for_each = var.autoscaler_config != null ? [var.autoscaler_config] : []
 
@@ -40,6 +42,8 @@ resource "scaleway_k8s_cluster" "this" {
       expendable_pods_priority_cutoff  = autoscaler_config.value.expendable_pods_priority_cutoff
       scale_down_utilization_threshold = autoscaler_config.value.scale_down_utilization_threshold
       max_graceful_termination_sec     = autoscaler_config.value.max_graceful_termination_sec
+      skip_nodes_with_local_storage    = autoscaler_config.value.skip_nodes_with_local_storage
+      log_level                        = autoscaler_config.value.log_level
     }
   }
 
@@ -94,6 +98,30 @@ resource "scaleway_k8s_pool" "this" {
 
   kubelet_args        = each.value.kubelet_args
   wait_for_pool_ready = each.value.wait_for_pool_ready
+  version             = each.value.version
+
+  labels    = length(each.value.labels) > 0 ? each.value.labels : null
+  user_data = length(each.value.user_data) > 0 ? each.value.user_data : null
+
+  dynamic "taints" {
+    for_each = each.value.taints
+
+    content {
+      key    = taints.value.key
+      value  = taints.value.value
+      effect = taints.value.effect
+    }
+  }
+
+  dynamic "startup_taints" {
+    for_each = each.value.startup_taints
+
+    content {
+      key    = startup_taints.value.key
+      value  = startup_taints.value.value
+      effect = startup_taints.value.effect
+    }
+  }
 
   dynamic "upgrade_policy" {
     for_each = each.value.upgrade_policy != null ? [each.value.upgrade_policy] : []
