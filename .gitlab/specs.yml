@@ -4,5 +4,7 @@ validate:specs:
   stage: validate
   image: node:24-alpine
   timeout: 5m
+  rules:
+    - when: always
   script:
     - npx -y @fission-ai/openspec@${OPENSPEC_VERSION} validate --all --strict
