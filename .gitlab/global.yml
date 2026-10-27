@@ -1,7 +1,10 @@
 variables:
   # Version detection from git tags
   GIT_DEPTH: 0  # Full history for proper tag detection
-  MISE_VERSION: "2024.12.14"
+  # Honoured by the https://mise.run installer. Since 2026.9.14 mise resolves
+  # GitHub releases and attestations through mise-versions.jdx.dev, so jobs
+  # without a GitHub token do not hit the api.github.com rate limit.
+  MISE_VERSION: "v2026.10.17"
   OSV_SCANNER_VERSION: "1.9.1"
   # Same as the "npm:@fission-ai/openspec" pin in mise.toml.
   OPENSPEC_VERSION: "1.14.3"
