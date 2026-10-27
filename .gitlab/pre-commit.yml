@@ -10,7 +10,11 @@ pre-commit:
     MISE_DATA_DIR: $CI_PROJECT_DIR/.cache/mise
     MISE_CACHE_DIR: $CI_PROJECT_DIR/.cache/mise/cache
   cache:
-    key: pre-commit-${CI_COMMIT_REF_SLUG}
+    key:
+      files:
+        - mise.toml
+        - .pre-commit-config.yaml
+      prefix: pre-commit
     paths:
       - $CI_PROJECT_DIR/.cache
   before_script:
