@@ -18,7 +18,16 @@ A production-ready Terraform module for creating and managing **Scaleway Kapsule
 - **Storage**: Configurable root volumes (type, size) for nodes
 - **Lifecycle**: Upgrade policies, kubelet arguments, and placement groups
 - **Node Metadata**: Kubernetes labels, taints and startup taints reconciled on pool nodes, plus pool user data
+- **API Server Access Control**: Optional allow-list (`api_server_acl`) of CIDRs or Scaleway ranges, or full isolation
+- **Pool Private Network**: Optional per-pool `private_network_id` to attach a pool to another Private Network of the cluster's VPC
 - **Independent Pool Upgrades**: Set `upgrade_pools = false` and pin `node_pools[*].version` to upgrade pools separately from the cluster
+
+## Upgrade notes
+
+- **Provider floor `~> 2.89` (major)**: `scaleway_k8s_pool.private_network_id` needs provider 2.87.0. Run `tofu init -upgrade`; with no new input set, `tofu plan` shows no change.
+- **Pool `private_network_id`**: use the `region/uuid` form. Changing it on an existing pool replaces the pool; prefer a new pool name and drain the old one.
+- **`api_server_acl`**: the API server refuses callers outside the rules, including the machine that runs `tofu apply`; include the CI/runner egress CIDR. Setting it back to `null` restores allow-all.
+- **`user_data`** is stored in state: never put secrets in it.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
@@ -26,13 +35,13 @@ A production-ready Terraform module for creating and managing **Scaleway Kapsule
 | Name | Version |
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.10.0 |
-| <a name="requirement_scaleway"></a> [scaleway](#requirement\_scaleway) | ~> 2.86 |
+| <a name="requirement_scaleway"></a> [scaleway](#requirement\_scaleway) | ~> 2.89 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_scaleway"></a> [scaleway](#provider\_scaleway) | ~> 2.86 |
+| <a name="provider_scaleway"></a> [scaleway](#provider\_scaleway) | ~> 2.89 |
 
 ## Modules
 
@@ -42,6 +51,7 @@ No modules.
 
 | Name | Type |
 |------|------|
+| [scaleway_k8s_acl.this](https://registry.terraform.io/providers/scaleway/scaleway/latest/docs/resources/k8s_acl) | resource |
 | [scaleway_k8s_cluster.this](https://registry.terraform.io/providers/scaleway/scaleway/latest/docs/resources/k8s_cluster) | resource |
 | [scaleway_k8s_pool.this](https://registry.terraform.io/providers/scaleway/scaleway/latest/docs/resources/k8s_pool) | resource |
 | [scaleway_account_project.this](https://registry.terraform.io/providers/scaleway/scaleway/latest/docs/data-sources/account_project) | data source |
@@ -51,6 +61,7 @@ No modules.
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | <a name="input_admission_plugins"></a> [admission\_plugins](#input\_admission\_plugins) | List of Kubernetes admission plugins to enable on the cluster | `list(string)` | `[]` | no |
+| <a name="input_api_server_acl"></a> [api\_server\_acl](#input\_api\_server\_acl) | API server allow-list. Set either no\_ip\_allowed = true (full isolation) or rules (each with a description and exactly one of ip, a CIDR, or scaleway\_ranges = true). Null creates no ACL and keeps the provider default (allow all). WARNING: the API server then refuses every caller outside the rules, including the machine that runs tofu apply; include the CI/runner egress CIDR. Setting it back to null restores allow-all. | <pre>object({<br/>    no_ip_allowed = optional(bool, false)<br/>    rules = optional(list(object({<br/>      ip              = optional(string)<br/>      scaleway_ranges = optional(bool, false)<br/>      description     = optional(string)<br/>    })), [])<br/>  })</pre> | `null` | no |
 | <a name="input_apiserver_cert_sans"></a> [apiserver\_cert\_sans](#input\_apiserver\_cert\_sans) | Additional Subject Alternative Names for the API server certificate | `list(string)` | `[]` | no |
 | <a name="input_auto_upgrade"></a> [auto\_upgrade](#input\_auto\_upgrade) | Auto upgrade configuration for the cluster. When enabled, kubernetes\_version must be a minor version (e.g., '1.31'). | <pre>object({<br/>    enabled                       = optional(bool, false)<br/>    maintenance_window_start_hour = optional(number, 3)<br/>    maintenance_window_day        = optional(string, "sunday")<br/>  })</pre> | `{}` | no |
 | <a name="input_autoscaler_config"></a> [autoscaler\_config](#input\_autoscaler\_config) | Cluster autoscaler configuration. Set to null to disable the autoscaler. | <pre>object({<br/>    disable_scale_down               = optional(bool, false)<br/>    scale_down_delay_after_add       = optional(string, "10m")<br/>    scale_down_unneeded_time         = optional(string, "10m")<br/>    estimator                        = optional(string, "binpacking")<br/>    expander                         = optional(string, "random")<br/>    ignore_daemonsets_utilization    = optional(bool, false)<br/>    balance_similar_node_groups      = optional(bool, false)<br/>    expendable_pods_priority_cutoff  = optional(number, -10)<br/>    scale_down_utilization_threshold = optional(number, 0.5)<br/>    max_graceful_termination_sec     = optional(number, 600)<br/>    skip_nodes_with_local_storage    = optional(bool)<br/>    log_level                        = optional(number) # 0 (least verbose) to 4<br/>  })</pre> | `null` | no |
@@ -60,7 +71,7 @@ No modules.
 | <a name="input_feature_gates"></a> [feature\_gates](#input\_feature\_gates) | List of Kubernetes feature gates to enable on the cluster | `list(string)` | `[]` | no |
 | <a name="input_kubernetes_version"></a> [kubernetes\_version](#input\_kubernetes\_version) | Kubernetes version for the cluster (e.g., '1.31' for auto-upgrade or '1.31.0' for fixed version) | `string` | n/a | yes |
 | <a name="input_name"></a> [name](#input\_name) | Name of the Kubernetes cluster | `string` | n/a | yes |
-| <a name="input_node_pools"></a> [node\_pools](#input\_node\_pools) | Map of node pool configurations. The map key is used as the pool name. | <pre>map(object({<br/>    # Required<br/>    node_type = string<br/>    size      = number<br/><br/>    # Scaling<br/>    min_size    = optional(number)<br/>    max_size    = optional(number)<br/>    autoscaling = optional(bool, false)<br/>    autohealing = optional(bool, true)<br/><br/>    # Runtime<br/>    container_runtime = optional(string, "containerd")<br/>    kubelet_args      = optional(map(string), {})<br/>    user_data         = optional(map(string), {}) # key => content ("cloud-init" key is reserved)<br/><br/>    # Kubernetes node metadata (taints: reconciled; startup_taints: applied at node creation only)<br/>    labels = optional(map(string), {})<br/>    taints = optional(list(object({<br/>      key    = string<br/>      value  = string<br/>      effect = string<br/>    })), [])<br/>    startup_taints = optional(list(object({<br/>      key    = string<br/>      value  = string<br/>      effect = string<br/>    })), [])<br/><br/>    # Placement<br/>    placement_group_id = optional(string)<br/>    zone               = optional(string)<br/>    region             = optional(string)<br/><br/>    # Storage<br/>    root_volume_type       = optional(string)<br/>    root_volume_size_in_gb = optional(number)<br/><br/>    # Network<br/>    public_ip_disabled = optional(bool, false)<br/><br/>    # Metadata<br/>    tags = optional(list(string), [])<br/><br/>    # Lifecycle<br/>    wait_for_pool_ready = optional(bool, true)<br/>    version             = optional(string) # only honored when upgrade_pools = false<br/>    upgrade_policy = optional(object({<br/>      max_unavailable = optional(number, 1)<br/>      max_surge       = optional(number, 0)<br/>    }))<br/>  }))</pre> | `{}` | no |
+| <a name="input_node_pools"></a> [node\_pools](#input\_node\_pools) | Map of node pool configurations. The map key is used as the pool name. | <pre>map(object({<br/>    # Required<br/>    node_type = string<br/>    size      = number<br/><br/>    # Scaling<br/>    min_size    = optional(number)<br/>    max_size    = optional(number)<br/>    autoscaling = optional(bool, false)<br/>    autohealing = optional(bool, true)<br/><br/>    # Runtime<br/>    container_runtime = optional(string, "containerd")<br/>    kubelet_args      = optional(map(string), {})<br/>    user_data         = optional(map(string), {}) # key => content ("cloud-init" key is reserved)<br/><br/>    # Kubernetes node metadata (taints: reconciled; startup_taints: applied at node creation only)<br/>    labels = optional(map(string), {})<br/>    taints = optional(list(object({<br/>      key    = string<br/>      value  = string<br/>      effect = string<br/>    })), [])<br/>    startup_taints = optional(list(object({<br/>      key    = string<br/>      value  = string<br/>      effect = string<br/>    })), [])<br/><br/>    # Placement<br/>    placement_group_id = optional(string)<br/>    zone               = optional(string)<br/>    region             = optional(string)<br/><br/>    # Storage<br/>    root_volume_type       = optional(string)<br/>    root_volume_size_in_gb = optional(number)<br/><br/>    # Network<br/>    public_ip_disabled = optional(bool, false)<br/>    private_network_id = optional(string) # region/uuid; null = the cluster's Private Network. Changing it replaces the pool.<br/><br/>    # Metadata<br/>    tags = optional(list(string), [])<br/><br/>    # Lifecycle<br/>    wait_for_pool_ready = optional(bool, true)<br/>    version             = optional(string) # only honored when upgrade_pools = false<br/>    upgrade_policy = optional(object({<br/>      max_unavailable = optional(number, 1)<br/>      max_surge       = optional(number, 0)<br/>    }))<br/>  }))</pre> | `{}` | no |
 | <a name="input_oidc_config"></a> [oidc\_config](#input\_oidc\_config) | OpenID Connect configuration for the cluster API server | <pre>object({<br/>    issuer_url      = string<br/>    client_id       = string<br/>    username_claim  = optional(string)<br/>    username_prefix = optional(string)<br/>    groups_claim    = optional(list(string))<br/>    groups_prefix   = optional(string)<br/>    required_claim  = optional(list(string))<br/>  })</pre> | `null` | no |
 | <a name="input_organization_id"></a> [organization\_id](#input\_organization\_id) | Scaleway organization ID | `string` | n/a | yes |
 | <a name="input_private_network_id"></a> [private\_network\_id](#input\_private\_network\_id) | ID of the Scaleway VPC Private Network (format: region/uuid) | `string` | n/a | yes |
@@ -92,10 +103,12 @@ No modules.
 | <a name="output_organization_id"></a> [organization\_id](#output\_organization\_id) | Scaleway organization ID |
 | <a name="output_project_id"></a> [project\_id](#output\_project\_id) | Scaleway project ID |
 | <a name="output_region"></a> [region](#output\_region) | Region where the cluster is deployed |
+| <a name="output_srn"></a> [srn](#output\_srn) | Scaleway Resource Name (SRN) of the Kubernetes cluster |
 | <a name="output_status"></a> [status](#output\_status) | Status of the Kubernetes cluster |
 | <a name="output_tags"></a> [tags](#output\_tags) | Tags applied to the cluster |
 | <a name="output_type"></a> [type](#output\_type) | Type of the Kubernetes cluster |
 | <a name="output_updated_at"></a> [updated\_at](#output\_updated\_at) | Last update timestamp of the cluster |
+| <a name="output_upgrade_available"></a> [upgrade\_available](#output\_upgrade\_available) | Whether a Kubernetes version upgrade is available for the cluster |
 | <a name="output_version"></a> [version](#output\_version) | Kubernetes version of the cluster |
 | <a name="output_wildcard_dns"></a> [wildcard\_dns](#output\_wildcard\_dns) | Wildcard DNS record pointing to all cluster nodes |
 <!-- END_TF_DOCS -->
@@ -127,7 +140,7 @@ This module is provided "as is" without warranty of any kind, express or implied
 [terraform-badge]: https://img.shields.io/badge/Terraform-%3E%3D1.10-623CE4
 [terraform-url]: https://www.terraform.io
 
-[scaleway-badge]: https://img.shields.io/badge/Scaleway%20Provider-~%3E2.86-4f0599
+[scaleway-badge]: https://img.shields.io/badge/Scaleway%20Provider-~%3E2.89-4f0599
 [scaleway-url]: https://registry.terraform.io/providers/scaleway/scaleway/
 
 [release-badge]: https://img.shields.io/gitlab/v/release/leminnov/terraform/modules/scaleway-kubernetes?include_prereleases&sort=semver

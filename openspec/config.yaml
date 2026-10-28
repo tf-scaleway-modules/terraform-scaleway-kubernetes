@@ -31,7 +31,7 @@ context: |
   it with ?ref=vX.Y.Z. License: Apache-2.0.
 
   Stack: HCL only. required_version >= 1.10.0. Providers pinned with ~> in
-  versions.tf: scaleway/scaleway ~> 2.86. Every tool is pinned in mise.toml.
+  versions.tf: scaleway/scaleway ~> 2.89. Every tool is pinned in mise.toml.
 
   Layout: one .tf file per theme at the repository root: main.tf (cluster and
   node pools, each with lifecycle preconditions, plus a check block), data.tf (scaleway_account_project

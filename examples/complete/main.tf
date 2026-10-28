@@ -57,6 +57,11 @@ module "kubernetes" {
   #   groups_claim    = ["groups"]
   # }
 
+  # API server allow-list (optional): include the CI/runner egress CIDR or tofu apply is locked out
+  api_server_acl = length(var.api_server_acl_cidrs) > 0 ? {
+    rules = [for cidr in var.api_server_acl_cidrs : { ip = cidr, description = "allowed by example" }]
+  } : null
+
   # Node Pools
   node_pools = {
     # System pool for cluster components
@@ -96,6 +101,9 @@ module "kubernetes" {
       public_ip_disabled     = false
       wait_for_pool_ready    = true
       tags                   = ["pool:workers"]
+
+      # Another Private Network of the cluster's VPC; changing it replaces the pool
+      private_network_id = var.workers_private_network_id
 
       upgrade_policy = {
         max_unavailable = 1
