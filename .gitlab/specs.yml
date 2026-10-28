@@ -1,0 +1,10 @@
+# Strict validation of openspec/ (specs and change proposals), same command as
+# `mise run spec-validate`; the CLI version is the mise.toml pin.
+validate:specs:
+  stage: validate
+  image: node:24-alpine
+  timeout: 5m
+  rules:
+    - when: always
+  script:
+    - npx -y @fission-ai/openspec@${OPENSPEC_VERSION} validate --all --strict
