@@ -169,7 +169,7 @@ output "kubernetes_provider_config" {
 }
 
 output "helm_provider_config" {
-  description = "Configuration block for the Helm Terraform provider"
+  description = "Configuration block for the Helm Terraform provider (identical to kubernetes_provider_config; deprecated alias, prefer kubernetes_provider_config)"
   value = {
     host                   = try(scaleway_k8s_cluster.this.kubeconfig[0].host, null)
     cluster_ca_certificate = try(base64decode(scaleway_k8s_cluster.this.kubeconfig[0].cluster_ca_certificate), null)

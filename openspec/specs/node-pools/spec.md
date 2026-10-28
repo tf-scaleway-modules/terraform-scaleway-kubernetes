@@ -51,7 +51,7 @@ The pool SHALL carry a precondition requiring both `min_size` and `max_size` to 
 
 #### Scenario: Autoscaling without bounds
 - **WHEN** a pool `default` has `autoscaling = true` and no `max_size`
-- **THEN** planning fails with "When autoscaling is enabled, both min_size and max_size should be specified for pool 'default'."
+- **THEN** planning fails with "When autoscaling is enabled, both min_size and max_size must be specified for pool 'default'."
 
 #### Scenario: Autoscaling with bounds
 - **WHEN** a pool has `autoscaling = true`, `min_size = 1` and `max_size = 5`
@@ -83,7 +83,7 @@ The module SHALL accept a pool `zone` only as unset or in the form `<region>-<1.
 - **THEN** planning fails with "Zone must be in format 'region-az' (e.g., 'fr-par-1', 'nl-ams-2')."
 
 ### Requirement: Labels and user data
-The module SHALL send pool `labels` and `user_data` only when the map is non-empty, and `null` otherwise.
+The module SHALL send pool `labels` and `user_data` only when the map is non-empty, and `null` otherwise. The `user_data` key `cloud-init` is reserved by the provider and SHALL be rejected.
 
 #### Scenario: Labels set
 - **WHEN** a pool has `labels = { role = "web" }`
@@ -92,6 +92,10 @@ The module SHALL send pool `labels` and `user_data` only when the map is non-emp
 #### Scenario: Empty maps
 - **WHEN** a pool has `labels = {}` and `user_data = {}`
 - **THEN** neither argument is set on the pool
+
+#### Scenario: Reserved cloud-init key
+- **WHEN** a pool has `user_data = { "cloud-init" = "#cloud-config" }`
+- **THEN** planning fails with "Node pool user_data must not use the reserved key 'cloud-init'."
 
 ### Requirement: Taints and startup taints
 The module SHALL create one `taints` block per entry of a pool's `taints` and one `startup_taints` block per entry of `startup_taints`, each with `key`, `value` and `effect`. The effect of every taint and startup taint SHALL be `NoSchedule`, `PreferNoSchedule` or `NoExecute`.
@@ -120,25 +124,26 @@ The module SHALL add an `upgrade_policy` block to a pool only when the pool's `u
 - **THEN** one block with `max_unavailable = 1` and `max_surge = 0` is produced
 
 ### Requirement: Independent pool upgrades
-The module SHALL pass a pool's `version` to the pool, so that with the cluster input `upgrade_pools = false` each pool is upgraded separately by changing `node_pools[*].version`.
+The module SHALL pass a pool's `version` to the pool, so that with the cluster input `upgrade_pools = false` each pool is upgraded separately by changing `node_pools[*].version`. A `check` SHALL warn, without failing, when a pool sets `version` while `upgrade_pools` is not `false`, because the provider then ignores it.
 
 #### Scenario: Pinned pool version
 - **WHEN** `upgrade_pools = false` and a pool has `version = "1.31.2"`
-- **THEN** the pool is planned with that version
+- **THEN** the pool is planned with that version and no warning is raised
 
-### Requirement: Public IP requires a private network
-The pool SHALL carry a precondition that `public_ip_disabled` is only accepted when `private_network_id` is not `null`. `public_ip_disabled` defaults to `false`.
-
-#### Scenario: Public IP disabled with a private network
-- **WHEN** a pool has `public_ip_disabled = true` and `private_network_id` is set
-- **THEN** the pool is planned with public IPs disabled
+#### Scenario: Pool version without decoupling
+- **WHEN** `upgrade_pools` is `null` or `true` and a pool has `version = "1.31.2"`
+- **THEN** the check warns "node_pools[*].version is only honored when upgrade_pools = false."
 
 ### Requirement: Other pool arguments
-The module SHALL pass `placement_group_id`, `zone`, `region`, `kubelet_args`, `tags` and `wait_for_pool_ready` (default `true`) from the pool entry to the pool.
+The module SHALL pass `placement_group_id`, `zone`, `region`, `kubelet_args`, `tags`, `public_ip_disabled` (default `false`) and `wait_for_pool_ready` (default `true`) from the pool entry to the pool.
 
 #### Scenario: Wait for readiness by default
 - **WHEN** a pool does not set `wait_for_pool_ready`
 - **THEN** the pool is planned with `wait_for_pool_ready = true`
+
+#### Scenario: Public IP disabled
+- **WHEN** a pool has `public_ip_disabled = true`
+- **THEN** the pool is planned with public IPs disabled
 
 ### Requirement: Pool outputs
 The module SHALL expose `node_pools` (a map by pool name with `id`, `name`, `status`, `version`, `node_type`, `size`, `min_size`, `max_size`, `current_size`, `autoscaling`, `autohealing`, `zone`, `region`, `created_at`, `updated_at` and a `nodes` list of `name`, `status`, `public_ip`, `public_ipv6`), `node_pool_ids` and `node_pool_versions`.

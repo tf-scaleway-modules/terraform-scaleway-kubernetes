@@ -134,13 +134,19 @@ resource "scaleway_k8s_pool" "this" {
 
   lifecycle {
     precondition {
-      condition     = !each.value.public_ip_disabled || var.private_network_id != null
-      error_message = "public_ip_disabled requires a private_network_id to be set on the cluster."
-    }
-
-    precondition {
       condition     = !each.value.autoscaling || (each.value.min_size != null && each.value.max_size != null)
-      error_message = "When autoscaling is enabled, both min_size and max_size should be specified for pool '${each.key}'."
+      error_message = "When autoscaling is enabled, both min_size and max_size must be specified for pool '${each.key}'."
     }
+  }
+}
+
+################################################################################
+# Checks
+################################################################################
+
+check "pool_version_requires_upgrade_pools" {
+  assert {
+    condition     = var.upgrade_pools == false || alltrue([for v in var.node_pools : v.version == null])
+    error_message = "node_pools[*].version is only honored when upgrade_pools = false."
   }
 }
