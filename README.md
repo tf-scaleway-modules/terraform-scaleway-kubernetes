@@ -77,7 +77,7 @@ No modules.
 | <a name="output_apiserver_url"></a> [apiserver\_url](#output\_apiserver\_url) | URL of the Kubernetes API server |
 | <a name="output_cni"></a> [cni](#output\_cni) | CNI plugin used by the cluster |
 | <a name="output_created_at"></a> [created\_at](#output\_created\_at) | Creation timestamp of the cluster |
-| <a name="output_helm_provider_config"></a> [helm\_provider\_config](#output\_helm\_provider\_config) | Configuration block for the Helm Terraform provider |
+| <a name="output_helm_provider_config"></a> [helm\_provider\_config](#output\_helm\_provider\_config) | Configuration block for the Helm Terraform provider (identical to kubernetes\_provider\_config; deprecated alias, prefer kubernetes\_provider\_config) |
 | <a name="output_id"></a> [id](#output\_id) | ID of the Kubernetes cluster |
 | <a name="output_kubeconfig"></a> [kubeconfig](#output\_kubeconfig) | Complete kubeconfig configuration object for the cluster |
 | <a name="output_kubeconfig_cluster_ca_certificate"></a> [kubeconfig\_cluster\_ca\_certificate](#output\_kubeconfig\_cluster\_ca\_certificate) | Base64 encoded cluster CA certificate |

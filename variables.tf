@@ -370,4 +370,11 @@ variable "node_pools" {
     ]))
     error_message = "Taint effect must be one of: NoSchedule, PreferNoSchedule, NoExecute."
   }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.node_pools : !contains(keys(v.user_data), "cloud-init")
+    ])
+    error_message = "Node pool user_data must not use the reserved key 'cloud-init'."
+  }
 }
