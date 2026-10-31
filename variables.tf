@@ -280,6 +280,7 @@ variable "node_pools" {
 
     # Network
     public_ip_disabled = optional(bool, false)
+    private_network_id = optional(string) # region/uuid; null = the cluster's Private Network. Changing it replaces the pool.
 
     # Metadata
     tags = optional(list(string), [])
@@ -376,5 +377,49 @@ variable "node_pools" {
       for k, v in var.node_pools : !contains(keys(v.user_data), "cloud-init")
     ])
     error_message = "Node pool user_data must not use the reserved key 'cloud-init'."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.node_pools : v.private_network_id == null || can(regex("^[a-z]{2}-[a-z]{3}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", v.private_network_id))
+    ])
+    error_message = "Node pool private_network_id must be in format 'region/uuid' (e.g., 'fr-par/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx')."
+  }
+}
+
+################################################################################
+# API Server Access Control
+################################################################################
+
+variable "api_server_acl" {
+  description = "API server allow-list. Set either no_ip_allowed = true (full isolation) or rules (each with a description and exactly one of ip, a CIDR, or scaleway_ranges = true). Null creates no ACL and keeps the provider default (allow all). WARNING: the API server then refuses every caller outside the rules, including the machine that runs tofu apply; include the CI/runner egress CIDR. Setting it back to null restores allow-all."
+  type = object({
+    no_ip_allowed = optional(bool, false)
+    rules = optional(list(object({
+      ip              = optional(string)
+      scaleway_ranges = optional(bool, false)
+      description     = optional(string)
+    })), [])
+  })
+  default = null
+
+  validation {
+    condition     = var.api_server_acl == null || var.api_server_acl.no_ip_allowed != (length(var.api_server_acl.rules) > 0)
+    error_message = "api_server_acl must set either no_ip_allowed = true or at least one rule, not both and not neither."
+  }
+
+  validation {
+    condition     = var.api_server_acl == null || alltrue([for r in var.api_server_acl.rules : (r.ip != null) != r.scaleway_ranges])
+    error_message = "Each api_server_acl rule must set exactly one of ip or scaleway_ranges = true."
+  }
+
+  validation {
+    condition     = var.api_server_acl == null || alltrue([for r in var.api_server_acl.rules : r.ip == null || can(cidrhost(r.ip, 0))])
+    error_message = "api_server_acl rule ip must be a CIDR (e.g. '203.0.113.0/24')."
+  }
+
+  validation {
+    condition     = var.api_server_acl == null || length([for r in var.api_server_acl.rules : r if r.scaleway_ranges]) <= 1
+    error_message = "api_server_acl may contain at most one rule with scaleway_ranges = true."
   }
 }

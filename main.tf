@@ -96,6 +96,7 @@ resource "scaleway_k8s_pool" "this" {
   root_volume_size_in_gb = each.value.root_volume_size_in_gb
   public_ip_disabled     = each.value.public_ip_disabled
 
+  private_network_id  = each.value.private_network_id
   kubelet_args        = each.value.kubelet_args
   wait_for_pool_ready = each.value.wait_for_pool_ready
   version             = each.value.version
@@ -141,6 +142,30 @@ resource "scaleway_k8s_pool" "this" {
 }
 
 ################################################################################
+# API Server Access Control
+################################################################################
+
+resource "scaleway_k8s_acl" "this" {
+  count = var.api_server_acl != null ? 1 : 0
+
+  cluster_id = scaleway_k8s_cluster.this.id
+  region     = scaleway_k8s_cluster.this.region
+
+  # The provider rejects an explicit false next to acl_rules (ExactlyOneOf).
+  no_ip_allowed = var.api_server_acl.no_ip_allowed ? true : null
+
+  dynamic "acl_rules" {
+    for_each = var.api_server_acl.rules
+
+    content {
+      ip              = acl_rules.value.ip
+      scaleway_ranges = acl_rules.value.scaleway_ranges ? true : null
+      description     = acl_rules.value.description
+    }
+  }
+}
+
+################################################################################
 # Checks
 ################################################################################
 
@@ -148,5 +173,12 @@ check "pool_version_requires_upgrade_pools" {
   assert {
     condition     = var.upgrade_pools == false || alltrue([for v in var.node_pools : v.version == null])
     error_message = "node_pools[*].version is only honored when upgrade_pools = false."
+  }
+}
+
+check "api_server_acl_not_open_to_world" {
+  assert {
+    condition     = var.api_server_acl == null || !anytrue([for r in var.api_server_acl.rules : r.ip != null && contains(["0.0.0.0/0", "::/0"], r.ip)])
+    error_message = "api_server_acl contains a world-open rule (0.0.0.0/0 or ::/0); it does not restrict API server access."
   }
 }
