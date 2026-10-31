@@ -51,12 +51,6 @@ output "kubeconfig" {
   sensitive   = true
 }
 
-output "kubeconfig_host" {
-  description = "Kubernetes API server host"
-  value       = module.kubernetes.kubeconfig_host
-  sensitive   = true
-}
-
 ################################################################################
 # Node Pool Outputs
 ################################################################################
@@ -78,11 +72,5 @@ output "node_pool_ids" {
 output "kubernetes_provider_config" {
   description = "Configuration for Kubernetes provider"
   value       = module.kubernetes.kubernetes_provider_config
-  sensitive   = true
-}
-
-output "helm_provider_config" {
-  description = "Configuration for Helm provider"
-  value       = module.kubernetes.helm_provider_config
   sensitive   = true
 }

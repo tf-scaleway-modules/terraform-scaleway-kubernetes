@@ -1,13 +1,7 @@
-variable "organization_id" {
-  description = "Scaleway organization ID"
+variable "project_id" {
+  description = "Scaleway project ID (UUID); null uses the provider default project"
   type        = string
-  default     = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-}
-
-variable "project_name" {
-  description = "Name of the Scaleway project"
-  type        = string
-  default     = "default"
+  default     = null
 }
 
 variable "private_network_id" {
@@ -24,6 +18,12 @@ variable "api_server_acl_cidrs" {
 
 variable "workers_private_network_id" {
   description = "Private Network of the workers pool (format: region/uuid); null uses the cluster's network"
+  type        = string
+  default     = null
+}
+
+variable "workers_security_group_id" {
+  description = "Security group of the workers pool; null keeps the Scaleway-managed group"
   type        = string
   default     = null
 }

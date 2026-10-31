@@ -7,11 +7,17 @@ module "kubernetes" {
   source = "../.."
 
   # Project
-  organization_id = var.organization_id
-  project_name    = var.project_name
+  project_id = var.project_id
 
   # Network
   private_network_id = var.private_network_id
+
+  # Cluster network ranges (optional); setting or changing a value replaces the cluster
+  # network_cidrs = {
+  #   pod            = "10.244.0.0/16"
+  #   service        = "10.32.0.0/20"
+  #   service_dns_ip = "10.32.0.10"
+  # }
 
   # Cluster Configuration
   name               = "production-cluster"
@@ -96,7 +102,7 @@ module "kubernetes" {
       autohealing            = true
       container_runtime      = "containerd"
       zone                   = "fr-par-1"
-      root_volume_type       = "b_ssd"
+      root_volume_type       = "sbs_15k"
       root_volume_size_in_gb = 100
       public_ip_disabled     = false
       wait_for_pool_ready    = true
@@ -104,6 +110,9 @@ module "kubernetes" {
 
       # Another Private Network of the cluster's VPC; changing it replaces the pool
       private_network_id = var.workers_private_network_id
+
+      # Custom group: it must allow node registration and Kubernetes traffic
+      security_group_id = var.workers_security_group_id
 
       upgrade_policy = {
         max_unavailable = 1
@@ -140,16 +149,16 @@ module "kubernetes" {
 ################################################################################
 
 provider "kubernetes" {
-  host                   = module.kubernetes.kubeconfig_host
-  cluster_ca_certificate = base64decode(module.kubernetes.kubeconfig_cluster_ca_certificate)
-  token                  = module.kubernetes.kubeconfig_token
+  host                   = module.kubernetes.kubernetes_provider_config.host
+  cluster_ca_certificate = module.kubernetes.kubernetes_provider_config.cluster_ca_certificate
+  token                  = module.kubernetes.kubernetes_provider_config.token
 }
 
-# Note: Helm provider configuration should be in a separate file or use the kubernetes provider
+# Note: configure the Helm provider in a separate file from the same kubernetes_provider_config values
 # provider "helm" {
 #   kubernetes = {
-#     host                   = module.kubernetes.kubeconfig_host
-#     cluster_ca_certificate = base64decode(module.kubernetes.kubeconfig_cluster_ca_certificate)
-#     token                  = module.kubernetes.kubeconfig_token
+#     host                   = module.kubernetes.kubernetes_provider_config.host
+#     cluster_ca_certificate = module.kubernetes.kubernetes_provider_config.cluster_ca_certificate
+#     token                  = module.kubernetes.kubernetes_provider_config.token
 #   }
 # }

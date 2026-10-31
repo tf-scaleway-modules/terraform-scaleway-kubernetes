@@ -22,11 +22,28 @@ A production-ready Terraform module for creating and managing **Scaleway Kapsule
 - **Pool Private Network**: Optional per-pool `private_network_id` to attach a pool to another Private Network of the cluster's VPC
 - **Independent Pool Upgrades**: Set `upgrade_pools = false` and pin `node_pools[*].version` to upgrade pools separately from the cluster
 
-## Upgrade notes
+## Upgrading from v2 to v3
 
-- **Provider floor `~> 2.89` (major)**: `scaleway_k8s_pool.private_network_id` needs provider 2.87.0. Run `tofu init -upgrade`; with no new input set, `tofu plan` shows no change.
+Run `tofu init -upgrade && tofu plan` after the edits below: expect only in-place tag updates on pools that set `tags`. The provider floor (`~> 2.89`) and `required_version` are unchanged. Rollback: pin `v2.0.0`; no state format change.
+
+| Change | Edit |
+|--------|------|
+| Input `organization_id` removed | Delete it |
+| Input `project_name` removed, `project_id` added | Pass `project_id = "<uuid>"` if the project is not the provider default. A wrong value replaces the cluster (ForceNew): compare with the v2 `project_id` output first |
+| `node_pools[*].region` removed | Delete it; the pool region is the cluster region |
+| `node_pools[*].tags` merged with the module `tags` | Expect one in-place tag update per pool that sets `tags` |
+| Output `kubeconfig` is one object (or `null`) instead of a list | Replace `kubeconfig[0].x` with `kubeconfig.x` |
+| Outputs `kubeconfig_host`, `kubeconfig_cluster_ca_certificate`, `kubeconfig_token` removed | Use `apiserver_url` or `kubernetes_provider_config.host`, `.cluster_ca_certificate` (already decoded), `.token` |
+| Output `helm_provider_config` removed | Use `kubernetes_provider_config` |
+
+New optional inputs (no change when unset): `network_cidrs` (pod, service, DNS IP; setting or changing a value replaces the cluster and a custom value cannot be unset), `node_pools[*].security_group_id`, and root volume types `sbs_5k` and `sbs_15k`.
+
+Cautions:
+
+- **Pool `security_group_id`**: a custom group must keep node registration and Kubernetes traffic open or the nodes never become ready. Leave it unset to keep the Scaleway-managed group.
 - **Pool `private_network_id`**: use the `region/uuid` form. Changing it on an existing pool replaces the pool; prefer a new pool name and drain the old one.
 - **`api_server_acl`**: the API server refuses callers outside the rules, including the machine that runs `tofu apply`; include the CI/runner egress CIDR. Setting it back to `null` restores allow-all.
+- **Kubeconfig in state**: the kubeconfig token is a computed cluster attribute and stays in the state, marked sensitive; provider 2.89 has no write-only or ephemeral kubeconfig. Protect the state accordingly.
 - **`user_data`** is stored in state: never put secrets in it.
 
 <!-- BEGIN_TF_DOCS -->
@@ -54,7 +71,6 @@ No modules.
 | [scaleway_k8s_acl.this](https://registry.terraform.io/providers/scaleway/scaleway/latest/docs/resources/k8s_acl) | resource |
 | [scaleway_k8s_cluster.this](https://registry.terraform.io/providers/scaleway/scaleway/latest/docs/resources/k8s_cluster) | resource |
 | [scaleway_k8s_pool.this](https://registry.terraform.io/providers/scaleway/scaleway/latest/docs/resources/k8s_pool) | resource |
-| [scaleway_account_project.this](https://registry.terraform.io/providers/scaleway/scaleway/latest/docs/data-sources/account_project) | data source |
 
 ## Inputs
 
@@ -71,11 +87,11 @@ No modules.
 | <a name="input_feature_gates"></a> [feature\_gates](#input\_feature\_gates) | List of Kubernetes feature gates to enable on the cluster | `list(string)` | `[]` | no |
 | <a name="input_kubernetes_version"></a> [kubernetes\_version](#input\_kubernetes\_version) | Kubernetes version for the cluster (e.g., '1.31' for auto-upgrade or '1.31.0' for fixed version) | `string` | n/a | yes |
 | <a name="input_name"></a> [name](#input\_name) | Name of the Kubernetes cluster | `string` | n/a | yes |
-| <a name="input_node_pools"></a> [node\_pools](#input\_node\_pools) | Map of node pool configurations. The map key is used as the pool name. | <pre>map(object({<br/>    # Required<br/>    node_type = string<br/>    size      = number<br/><br/>    # Scaling<br/>    min_size    = optional(number)<br/>    max_size    = optional(number)<br/>    autoscaling = optional(bool, false)<br/>    autohealing = optional(bool, true)<br/><br/>    # Runtime<br/>    container_runtime = optional(string, "containerd")<br/>    kubelet_args      = optional(map(string), {})<br/>    user_data         = optional(map(string), {}) # key => content ("cloud-init" key is reserved)<br/><br/>    # Kubernetes node metadata (taints: reconciled; startup_taints: applied at node creation only)<br/>    labels = optional(map(string), {})<br/>    taints = optional(list(object({<br/>      key    = string<br/>      value  = string<br/>      effect = string<br/>    })), [])<br/>    startup_taints = optional(list(object({<br/>      key    = string<br/>      value  = string<br/>      effect = string<br/>    })), [])<br/><br/>    # Placement<br/>    placement_group_id = optional(string)<br/>    zone               = optional(string)<br/>    region             = optional(string)<br/><br/>    # Storage<br/>    root_volume_type       = optional(string)<br/>    root_volume_size_in_gb = optional(number)<br/><br/>    # Network<br/>    public_ip_disabled = optional(bool, false)<br/>    private_network_id = optional(string) # region/uuid; null = the cluster's Private Network. Changing it replaces the pool.<br/><br/>    # Metadata<br/>    tags = optional(list(string), [])<br/><br/>    # Lifecycle<br/>    wait_for_pool_ready = optional(bool, true)<br/>    version             = optional(string) # only honored when upgrade_pools = false<br/>    upgrade_policy = optional(object({<br/>      max_unavailable = optional(number, 1)<br/>      max_surge       = optional(number, 0)<br/>    }))<br/>  }))</pre> | `{}` | no |
+| <a name="input_network_cidrs"></a> [network\_cidrs](#input\_network\_cidrs) | Cluster network ranges: pod and service CIDRs and the cluster DNS IP. An unset member keeps the Scaleway default. Setting or changing a value replaces the cluster, and a custom value cannot be unset. | <pre>object({<br/>    pod            = optional(string)<br/>    service        = optional(string)<br/>    service_dns_ip = optional(string)<br/>  })</pre> | `{}` | no |
+| <a name="input_node_pools"></a> [node\_pools](#input\_node\_pools) | Map of node pool configurations. The map key is used as the pool name. | <pre>map(object({<br/>    # Required<br/>    node_type = string<br/>    size      = number<br/><br/>    # Scaling<br/>    min_size    = optional(number)<br/>    max_size    = optional(number)<br/>    autoscaling = optional(bool, false)<br/>    autohealing = optional(bool, true)<br/><br/>    # Runtime<br/>    container_runtime = optional(string, "containerd")<br/>    kubelet_args      = optional(map(string), {})<br/>    user_data         = optional(map(string), {}) # key => content ("cloud-init" key is reserved)<br/><br/>    # Kubernetes node metadata (taints: reconciled; startup_taints: applied at node creation only)<br/>    labels = optional(map(string), {})<br/>    taints = optional(list(object({<br/>      key    = string<br/>      value  = string<br/>      effect = string<br/>    })), [])<br/>    startup_taints = optional(list(object({<br/>      key    = string<br/>      value  = string<br/>      effect = string<br/>    })), [])<br/><br/>    # Placement<br/>    placement_group_id = optional(string)<br/>    zone               = optional(string)<br/><br/>    # Storage<br/>    root_volume_type       = optional(string)<br/>    root_volume_size_in_gb = optional(number)<br/><br/>    # Network<br/>    public_ip_disabled = optional(bool, false)<br/>    private_network_id = optional(string) # region/uuid; null = the cluster's Private Network. Changing it replaces the pool.<br/>    security_group_id  = optional(string) # null = Scaleway-managed group; a custom group must allow node registration and Kubernetes traffic or nodes never become ready<br/><br/>    # Metadata<br/>    tags = optional(list(string), []) # merged with the module tags<br/><br/>    # Lifecycle<br/>    wait_for_pool_ready = optional(bool, true)<br/>    version             = optional(string) # only honored when upgrade_pools = false<br/>    upgrade_policy = optional(object({<br/>      max_unavailable = optional(number, 1)<br/>      max_surge       = optional(number, 0)<br/>    }))<br/>  }))</pre> | `{}` | no |
 | <a name="input_oidc_config"></a> [oidc\_config](#input\_oidc\_config) | OpenID Connect configuration for the cluster API server | <pre>object({<br/>    issuer_url      = string<br/>    client_id       = string<br/>    username_claim  = optional(string)<br/>    username_prefix = optional(string)<br/>    groups_claim    = optional(list(string))<br/>    groups_prefix   = optional(string)<br/>    required_claim  = optional(list(string))<br/>  })</pre> | `null` | no |
-| <a name="input_organization_id"></a> [organization\_id](#input\_organization\_id) | Scaleway organization ID | `string` | n/a | yes |
 | <a name="input_private_network_id"></a> [private\_network\_id](#input\_private\_network\_id) | ID of the Scaleway VPC Private Network (format: region/uuid) | `string` | n/a | yes |
-| <a name="input_project_name"></a> [project\_name](#input\_project\_name) | Name of the Scaleway project | `string` | `"default"` | no |
+| <a name="input_project_id"></a> [project\_id](#input\_project\_id) | ID of the Scaleway project that owns the cluster (UUID). Null uses the provider default project. Changing it replaces the cluster. | `string` | `null` | no |
 | <a name="input_region"></a> [region](#input\_region) | Scaleway region for the cluster (defaults to provider region) | `string` | `null` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to the Kubernetes cluster | `list(string)` | `[]` | no |
 | <a name="input_type"></a> [type](#input\_type) | Type of Kubernetes cluster | `string` | `"kapsule"` | no |
@@ -88,13 +104,9 @@ No modules.
 | <a name="output_apiserver_url"></a> [apiserver\_url](#output\_apiserver\_url) | URL of the Kubernetes API server |
 | <a name="output_cni"></a> [cni](#output\_cni) | CNI plugin used by the cluster |
 | <a name="output_created_at"></a> [created\_at](#output\_created\_at) | Creation timestamp of the cluster |
-| <a name="output_helm_provider_config"></a> [helm\_provider\_config](#output\_helm\_provider\_config) | Configuration block for the Helm Terraform provider (identical to kubernetes\_provider\_config; deprecated alias, prefer kubernetes\_provider\_config) |
 | <a name="output_id"></a> [id](#output\_id) | ID of the Kubernetes cluster |
-| <a name="output_kubeconfig"></a> [kubeconfig](#output\_kubeconfig) | Complete kubeconfig configuration object for the cluster |
-| <a name="output_kubeconfig_cluster_ca_certificate"></a> [kubeconfig\_cluster\_ca\_certificate](#output\_kubeconfig\_cluster\_ca\_certificate) | Base64 encoded cluster CA certificate |
-| <a name="output_kubeconfig_file"></a> [kubeconfig\_file](#output\_kubeconfig\_file) | Raw kubeconfig file content (YAML format) |
-| <a name="output_kubeconfig_host"></a> [kubeconfig\_host](#output\_kubeconfig\_host) | Kubernetes API server host from kubeconfig |
-| <a name="output_kubeconfig_token"></a> [kubeconfig\_token](#output\_kubeconfig\_token) | Authentication token for the cluster |
+| <a name="output_kubeconfig"></a> [kubeconfig](#output\_kubeconfig) | Kubeconfig object of the cluster (config\_file, host, cluster\_ca\_certificate, token); null when unavailable |
+| <a name="output_kubeconfig_file"></a> [kubeconfig\_file](#output\_kubeconfig\_file) | Raw kubeconfig file content (YAML format); null when unavailable |
 | <a name="output_kubernetes_provider_config"></a> [kubernetes\_provider\_config](#output\_kubernetes\_provider\_config) | Configuration block for the Kubernetes Terraform provider |
 | <a name="output_name"></a> [name](#output\_name) | Name of the Kubernetes cluster |
 | <a name="output_node_pool_ids"></a> [node\_pool\_ids](#output\_node\_pool\_ids) | Map of node pool names to their IDs |

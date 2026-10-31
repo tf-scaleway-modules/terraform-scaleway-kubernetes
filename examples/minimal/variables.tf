@@ -1,12 +1,7 @@
-variable "organization_id" {
-  description = "Scaleway organization ID"
+variable "project_id" {
+  description = "Scaleway project ID (UUID); null uses the provider default project"
   type        = string
-}
-
-variable "project_name" {
-  description = "Name of the Scaleway project"
-  type        = string
-  default     = "default"
+  default     = null
 }
 
 variable "private_network_id" {

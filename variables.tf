@@ -2,20 +2,15 @@
 # Project Configuration
 ################################################################################
 
-variable "organization_id" {
-  description = "Scaleway organization ID"
+variable "project_id" {
+  description = "ID of the Scaleway project that owns the cluster (UUID). Null uses the provider default project. Changing it replaces the cluster."
   type        = string
+  default     = null
 
   validation {
-    condition     = can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", var.organization_id))
-    error_message = "Organization ID must be a valid UUID."
+    condition     = var.project_id == null || can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", var.project_id))
+    error_message = "Project ID must be a valid UUID."
   }
-}
-
-variable "project_name" {
-  description = "Name of the Scaleway project"
-  type        = string
-  default     = "default"
 }
 
 ################################################################################
@@ -107,6 +102,26 @@ variable "private_network_id" {
   validation {
     condition     = can(regex("^[a-z]{2}-[a-z]{3}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", var.private_network_id))
     error_message = "Private network ID must be in format 'region/uuid' (e.g., 'fr-par/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx')."
+  }
+}
+
+variable "network_cidrs" {
+  description = "Cluster network ranges: pod and service CIDRs and the cluster DNS IP. An unset member keeps the Scaleway default. Setting or changing a value replaces the cluster, and a custom value cannot be unset."
+  type = object({
+    pod            = optional(string)
+    service        = optional(string)
+    service_dns_ip = optional(string)
+  })
+  default = {}
+
+  validation {
+    condition     = alltrue([for c in [var.network_cidrs.pod, var.network_cidrs.service] : c == null || (can(cidrhost(c, 0)) && strcontains(c, "/"))])
+    error_message = "network_cidrs.pod and network_cidrs.service must be CIDRs (e.g. '10.244.0.0/16')."
+  }
+
+  validation {
+    condition     = var.network_cidrs.service_dns_ip == null || (can(cidrhost("${var.network_cidrs.service_dns_ip}/32", 0)) && !strcontains(var.network_cidrs.service_dns_ip, "/"))
+    error_message = "network_cidrs.service_dns_ip must be an IP address (e.g. '10.32.0.10')."
   }
 }
 
@@ -272,7 +287,6 @@ variable "node_pools" {
     # Placement
     placement_group_id = optional(string)
     zone               = optional(string)
-    region             = optional(string)
 
     # Storage
     root_volume_type       = optional(string)
@@ -281,9 +295,10 @@ variable "node_pools" {
     # Network
     public_ip_disabled = optional(bool, false)
     private_network_id = optional(string) # region/uuid; null = the cluster's Private Network. Changing it replaces the pool.
+    security_group_id  = optional(string) # null = Scaleway-managed group; a custom group must allow node registration and Kubernetes traffic or nodes never become ready
 
     # Metadata
-    tags = optional(list(string), [])
+    tags = optional(list(string), []) # merged with the module tags
 
     # Lifecycle
     wait_for_pool_ready = optional(bool, true)
@@ -344,9 +359,9 @@ variable "node_pools" {
 
   validation {
     condition = alltrue([
-      for k, v in var.node_pools : v.root_volume_type == null || contains(["l_ssd", "b_ssd"], v.root_volume_type)
+      for k, v in var.node_pools : v.root_volume_type == null || contains(["l_ssd", "b_ssd", "sbs_5k", "sbs_15k"], v.root_volume_type)
     ])
-    error_message = "Root volume type must be one of: l_ssd, b_ssd."
+    error_message = "Root volume type must be one of: l_ssd, b_ssd, sbs_5k, sbs_15k."
   }
 
   validation {
