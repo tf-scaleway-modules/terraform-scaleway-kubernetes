@@ -7,6 +7,11 @@ output "id" {
   value       = scaleway_k8s_cluster.this.id
 }
 
+output "srn" {
+  description = "Scaleway Resource Name (SRN) of the Kubernetes cluster"
+  value       = scaleway_k8s_cluster.this.srn
+}
+
 output "name" {
   description = "Name of the Kubernetes cluster"
   value       = scaleway_k8s_cluster.this.name
@@ -20,6 +25,11 @@ output "status" {
 output "version" {
   description = "Kubernetes version of the cluster"
   value       = scaleway_k8s_cluster.this.version
+}
+
+output "upgrade_available" {
+  description = "Whether a Kubernetes version upgrade is available for the cluster"
+  value       = scaleway_k8s_cluster.this.upgrade_available
 }
 
 output "type" {
@@ -117,21 +127,23 @@ output "node_pools" {
   description = "Map of node pool configurations and status"
   value = {
     for name, pool in scaleway_k8s_pool.this : name => {
-      id           = pool.id
-      name         = pool.name
-      status       = pool.status
-      version      = pool.version
-      node_type    = pool.node_type
-      size         = pool.size
-      min_size     = pool.min_size
-      max_size     = pool.max_size
-      current_size = pool.current_size
-      autoscaling  = pool.autoscaling
-      autohealing  = pool.autohealing
-      zone         = pool.zone
-      region       = pool.region
-      created_at   = pool.created_at
-      updated_at   = pool.updated_at
+      id                 = pool.id
+      srn                = pool.srn
+      name               = pool.name
+      status             = pool.status
+      version            = pool.version
+      node_type          = pool.node_type
+      size               = pool.size
+      min_size           = pool.min_size
+      max_size           = pool.max_size
+      current_size       = pool.current_size
+      autoscaling        = pool.autoscaling
+      autohealing        = pool.autohealing
+      private_network_id = pool.private_network_id
+      zone               = pool.zone
+      region             = pool.region
+      created_at         = pool.created_at
+      updated_at         = pool.updated_at
       nodes = [
         for node in pool.nodes : {
           name        = node.name
