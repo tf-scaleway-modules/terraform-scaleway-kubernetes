@@ -11,10 +11,14 @@ resource "scaleway_k8s_cluster" "this" {
   tags        = var.tags
 
   region     = var.region
-  project_id = data.scaleway_account_project.this.id
+  project_id = var.project_id
 
   private_network_id          = var.private_network_id
   delete_additional_resources = var.delete_additional_resources
+
+  pod_cidr       = var.network_cidrs.pod
+  service_cidr   = var.network_cidrs.service
+  service_dns_ip = var.network_cidrs.service_dns_ip
 
   feature_gates       = length(var.feature_gates) > 0 ? var.feature_gates : null
   admission_plugins   = length(var.admission_plugins) > 0 ? var.admission_plugins : null
@@ -86,18 +90,19 @@ resource "scaleway_k8s_pool" "this" {
   autoscaling       = each.value.autoscaling
   autohealing       = each.value.autohealing
   container_runtime = each.value.container_runtime
-  tags              = each.value.tags
+  tags              = distinct(concat(var.tags, each.value.tags))
 
   placement_group_id = each.value.placement_group_id
   zone               = each.value.zone
-  region             = each.value.region
+  region             = scaleway_k8s_cluster.this.region
+  security_group_id  = each.value.security_group_id
 
   root_volume_type       = each.value.root_volume_type
   root_volume_size_in_gb = each.value.root_volume_size_in_gb
   public_ip_disabled     = each.value.public_ip_disabled
 
   private_network_id  = each.value.private_network_id
-  kubelet_args        = each.value.kubelet_args
+  kubelet_args        = length(each.value.kubelet_args) > 0 ? each.value.kubelet_args : null
   wait_for_pool_ready = each.value.wait_for_pool_ready
   version             = each.value.version
 

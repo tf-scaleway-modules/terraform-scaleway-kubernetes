@@ -65,11 +65,15 @@ The module SHALL accept `container_runtime` only as `containerd` (default) or `c
 - **THEN** planning fails with "Container runtime must be one of: containerd, crio."
 
 ### Requirement: Root volume
-The module SHALL accept `root_volume_type` only as unset, `l_ssd` or `b_ssd`, and `root_volume_size_in_gb` only as unset or at least 20.
+The module SHALL accept `root_volume_type` only as unset, `l_ssd`, `b_ssd`, `sbs_5k` or `sbs_15k`, and `root_volume_size_in_gb` only as unset or at least 20.
 
 #### Scenario: Invalid volume type
 - **WHEN** a pool has `root_volume_type = "nvme"`
-- **THEN** planning fails with "Root volume type must be one of: l_ssd, b_ssd."
+- **THEN** planning fails with "Root volume type must be one of: l_ssd, b_ssd, sbs_5k, sbs_15k."
+
+#### Scenario: Block storage type
+- **WHEN** a pool has `root_volume_type = "sbs_15k"`
+- **THEN** the validation passes
 
 #### Scenario: Volume too small
 - **WHEN** a pool has `root_volume_size_in_gb = 10`
@@ -135,7 +139,7 @@ The module SHALL pass a pool's `version` to the pool, so that with the cluster i
 - **THEN** the check warns "node_pools[*].version is only honored when upgrade_pools = false."
 
 ### Requirement: Other pool arguments
-The module SHALL pass `placement_group_id`, `zone`, `region`, `kubelet_args`, `tags`, `public_ip_disabled` (default `false`) and `wait_for_pool_ready` (default `true`) from the pool entry to the pool.
+The module SHALL pass `placement_group_id`, `zone`, `kubelet_args`, `public_ip_disabled` (default `false`) and `wait_for_pool_ready` (default `true`) to the pool, sending `kubelet_args` as `null` when empty. The pool region SHALL be the cluster region; there is no pool `region` input.
 
 #### Scenario: Wait for readiness by default
 - **WHEN** a pool does not set `wait_for_pool_ready`
@@ -145,8 +149,12 @@ The module SHALL pass `placement_group_id`, `zone`, `region`, `kubelet_args`, `t
 - **WHEN** a pool has `public_ip_disabled = true`
 - **THEN** the pool is planned with public IPs disabled
 
+#### Scenario: Pool region input
+- **WHEN** a pool sets `region`
+- **THEN** planning fails because the attribute is not supported
+
 ### Requirement: Pool outputs
-The module SHALL expose `node_pools` (a map by pool name with `id`, `srn`, `name`, `status`, `version`, `node_type`, `size`, `min_size`, `max_size`, `current_size`, `autoscaling`, `autohealing`, `private_network_id`, `zone`, `region`, `created_at`, `updated_at` and a `nodes` list of `name`, `status`, `public_ip`, `public_ipv6`), `node_pool_ids` and `node_pool_versions`.
+The module SHALL expose `node_pools` (a map by pool name with `id`, `srn`, `name`, `status`, `version`, `node_type`, `size`, `min_size`, `max_size`, `current_size`, `autoscaling`, `autohealing`, `private_network_id`, `security_group_id`, `zone`, `region`, `created_at`, `updated_at` and a `nodes` list of `id`, `name`, `status`, `public_ip`, `public_ipv6`, `private_ips`), `node_pool_ids` and `node_pool_versions`.
 
 #### Scenario: Pool IDs
 - **WHEN** pools `default` and `gpu` are applied
@@ -155,6 +163,10 @@ The module SHALL expose `node_pools` (a map by pool name with `id`, `srn`, `name
 #### Scenario: Pool network and SRN
 - **WHEN** a pool is applied
 - **THEN** its `node_pools` entry carries the effective `private_network_id` and the pool `srn`
+
+#### Scenario: Private-only node
+- **WHEN** a pool with `public_ip_disabled = true` is applied
+- **THEN** each node entry carries its `private_ips` addresses
 
 ### Requirement: Pool Private Network
 The module SHALL accept an optional `private_network_id` per pool, in the form `<region>/<uuid>`, and pass it to the pool. With the default `null` the argument is not sent, the nodes join the cluster's Private Network, and an existing pool is neither changed nor replaced. A pool Private Network SHALL belong to the same VPC as the cluster; the provider enforces this at apply time. Changing the value of an existing pool replaces the pool.
@@ -174,3 +186,21 @@ The module SHALL accept an optional `private_network_id` per pool, in the form `
 #### Scenario: Second plan
 - **WHEN** the pool has been applied with or without `private_network_id` and the inputs are unchanged
 - **THEN** the next plan shows no change
+
+### Requirement: Pool tags
+The module SHALL set each pool's tags to the distinct union of the module `tags` and the pool's `tags`.
+
+#### Scenario: Merged tags
+- **WHEN** `tags = ["env:prod"]` and a pool has `tags = ["pool:web", "env:prod"]`
+- **THEN** the pool is planned with the tags `env:prod` and `pool:web` once each
+
+### Requirement: Pool security group
+The module SHALL accept an optional `security_group_id` per pool and pass it to the pool; with `null` it is not sent and the Scaleway-managed group is kept without a plan change. The group must allow Kubernetes node traffic.
+
+#### Scenario: Default group
+- **WHEN** a pool does not set `security_group_id`
+- **THEN** the pool is planned without that argument and an existing pool shows no change
+
+#### Scenario: Custom group
+- **WHEN** a pool has `security_group_id = "fr-par-1/33333333-3333-3333-3333-333333333333"`
+- **THEN** the pool is planned with that security group

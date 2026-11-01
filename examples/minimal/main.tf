@@ -6,8 +6,7 @@ module "kubernetes" {
   source = "../.."
 
   # Project
-  organization_id = var.organization_id
-  project_name    = var.project_name
+  project_id = var.project_id
 
   # Network
   private_network_id = var.private_network_id
