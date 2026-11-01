@@ -49,7 +49,7 @@ output "region" {
 
 output "project_id" {
   description = "Scaleway project ID"
-  value       = data.scaleway_account_project.this.id
+  value       = scaleway_k8s_cluster.this.project_id
 }
 
 output "organization_id" {
@@ -91,31 +91,14 @@ output "wildcard_dns" {
 ################################################################################
 
 output "kubeconfig" {
-  description = "Complete kubeconfig configuration object for the cluster"
-  value       = scaleway_k8s_cluster.this.kubeconfig
+  description = "Kubeconfig object of the cluster (config_file, host, cluster_ca_certificate, token); null when unavailable"
+  value       = try(scaleway_k8s_cluster.this.kubeconfig[0], null)
   sensitive   = true
 }
 
 output "kubeconfig_file" {
-  description = "Raw kubeconfig file content (YAML format)"
+  description = "Raw kubeconfig file content (YAML format); null when unavailable"
   value       = try(scaleway_k8s_cluster.this.kubeconfig[0].config_file, null)
-  sensitive   = true
-}
-
-output "kubeconfig_host" {
-  description = "Kubernetes API server host from kubeconfig"
-  value       = try(scaleway_k8s_cluster.this.kubeconfig[0].host, null)
-}
-
-output "kubeconfig_cluster_ca_certificate" {
-  description = "Base64 encoded cluster CA certificate"
-  value       = try(scaleway_k8s_cluster.this.kubeconfig[0].cluster_ca_certificate, null)
-  sensitive   = true
-}
-
-output "kubeconfig_token" {
-  description = "Authentication token for the cluster"
-  value       = try(scaleway_k8s_cluster.this.kubeconfig[0].token, null)
   sensitive   = true
 }
 
@@ -140,16 +123,19 @@ output "node_pools" {
       autoscaling        = pool.autoscaling
       autohealing        = pool.autohealing
       private_network_id = pool.private_network_id
+      security_group_id  = pool.security_group_id
       zone               = pool.zone
       region             = pool.region
       created_at         = pool.created_at
       updated_at         = pool.updated_at
       nodes = [
         for node in pool.nodes : {
+          id          = node.id
           name        = node.name
           status      = node.status
           public_ip   = node.public_ip
           public_ipv6 = node.public_ip_v6
+          private_ips = [for ip in node.private_ips : ip.address]
         }
       ]
     }
@@ -172,16 +158,6 @@ output "node_pool_versions" {
 
 output "kubernetes_provider_config" {
   description = "Configuration block for the Kubernetes Terraform provider"
-  value = {
-    host                   = try(scaleway_k8s_cluster.this.kubeconfig[0].host, null)
-    cluster_ca_certificate = try(base64decode(scaleway_k8s_cluster.this.kubeconfig[0].cluster_ca_certificate), null)
-    token                  = try(scaleway_k8s_cluster.this.kubeconfig[0].token, null)
-  }
-  sensitive = true
-}
-
-output "helm_provider_config" {
-  description = "Configuration block for the Helm Terraform provider (identical to kubernetes_provider_config; deprecated alias, prefer kubernetes_provider_config)"
   value = {
     host                   = try(scaleway_k8s_cluster.this.kubeconfig[0].host, null)
     cluster_ca_certificate = try(base64decode(scaleway_k8s_cluster.this.kubeconfig[0].cluster_ca_certificate), null)

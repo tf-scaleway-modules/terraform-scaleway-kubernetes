@@ -28,36 +28,52 @@ The module SHALL NOT contain `provider` or `backend` blocks; the caller configur
 - **THEN** the module uses that provider configuration without defining its own
 
 ### Requirement: Required inputs
-The module SHALL require `organization_id`, `name`, `kubernetes_version` and `private_network_id`, which have no default. Every input SHALL have a type and a description.
+The module SHALL require `name`, `kubernetes_version` and `private_network_id`, which have no default. Every input SHALL have a type and a description.
 
 #### Scenario: Missing required input
 - **WHEN** the module is called without `name`
 - **THEN** planning fails because the variable is required
 
+#### Scenario: Removed organization input
+- **WHEN** a caller still passes `organization_id`
+- **THEN** planning fails with an unsupported argument error
+
 ### Requirement: Optional inputs and defaults
-The module SHALL default `project_name` to `"default"`, `type` to `"kapsule"`, `cni` to `"cilium"`, `delete_additional_resources` to `false`, `tags`, `feature_gates`, `admission_plugins` and `apiserver_cert_sans` to `[]`, `auto_upgrade` to `{}`, `node_pools` to `{}`, and `description`, `region`, `upgrade_pools`, `autoscaler_config`, `oidc_config` and `api_server_acl` to `null`.
+The module SHALL default `type` to `"kapsule"`, `cni` to `"cilium"`, `delete_additional_resources` to `false`, the list inputs `tags`, `feature_gates`, `admission_plugins` and `apiserver_cert_sans` to `[]`, `auto_upgrade`, `network_cidrs` and `node_pools` to `{}`, and `project_id`, `description`, `region`, `upgrade_pools`, `autoscaler_config`, `oidc_config` and `api_server_acl` to `null`.
 
 #### Scenario: Defaults applied
 - **WHEN** only the required inputs and one node pool are given
-- **THEN** the cluster uses type `kapsule`, CNI `cilium`, no tags, and `delete_additional_resources = false`, and no API server ACL is created
-
-### Requirement: Organization ID format
-The module SHALL reject an `organization_id` that is not a lowercase hexadecimal UUID.
-
-#### Scenario: Invalid organization ID
-- **WHEN** `organization_id = "not-a-uuid"`
-- **THEN** planning fails with "Organization ID must be a valid UUID."
-
-### Requirement: Project lookup
-The module SHALL look up the Scaleway project by `project_name` within `organization_id` through the `scaleway_account_project` data source and create the cluster in that project.
-
-#### Scenario: Default project
-- **WHEN** `project_name` is not set
-- **THEN** the project named `default` of the organization is used
+- **THEN** the cluster uses type `kapsule`, CNI `cilium`, no tags, `delete_additional_resources = false`, the provider default project, and no API server ACL is created
 
 ### Requirement: Output set
-The module SHALL expose these outputs: `id`, `srn`, `name`, `status`, `version`, `upgrade_available`, `type`, `cni`, `region`, `project_id`, `organization_id`, `tags`, `created_at`, `updated_at`, `apiserver_url`, `wildcard_dns`, `kubeconfig`, `kubeconfig_file`, `kubeconfig_host`, `kubeconfig_cluster_ca_certificate`, `kubeconfig_token`, `node_pools`, `node_pool_ids`, `node_pool_versions`, `kubernetes_provider_config` and `helm_provider_config`. Every output SHALL have a description.
+The module SHALL expose these outputs: `id`, `srn`, `name`, `status`, `version`, `upgrade_available`, `type`, `cni`, `region`, `project_id`, `organization_id`, `tags`, `created_at`, `updated_at`, `apiserver_url`, `wildcard_dns`, `kubeconfig`, `kubeconfig_file`, `kubernetes_provider_config`, `node_pools`, `node_pool_ids` and `node_pool_versions`. Every output SHALL have a description.
 
 #### Scenario: Cluster identity outputs
 - **WHEN** the cluster is applied
-- **THEN** `id`, `srn`, `name`, `version`, `upgrade_available`, `type`, `cni`, `region`, `tags`, `apiserver_url` and `wildcard_dns` reflect the cluster resource, and `project_id` is the ID of the looked-up project
+- **THEN** `id`, `srn`, `name`, `version`, `type`, `cni`, `region`, `tags`, `apiserver_url` and `wildcard_dns` reflect the cluster, and `project_id` and `organization_id` are those of the cluster resource
+
+#### Scenario: Removed outputs
+- **WHEN** a caller reads `helm_provider_config`, `kubeconfig_host`, `kubeconfig_cluster_ca_certificate` or `kubeconfig_token`
+- **THEN** planning fails because the output does not exist
+
+### Requirement: Project selection
+The module SHALL accept an optional `project_id` (UUID) passed to the cluster, and SHALL contain no `scaleway_account_project` data source. With `null` the provider default project is used.
+
+#### Scenario: Default project
+- **WHEN** `project_id` is not set
+- **THEN** the cluster is planned without a module-chosen project and no project lookup occurs
+
+#### Scenario: Explicit project
+- **WHEN** `project_id = "11111111-1111-1111-1111-111111111111"`
+- **THEN** the cluster is planned in that project
+
+#### Scenario: Invalid project ID
+- **WHEN** `project_id = "default"`
+- **THEN** planning fails with "Project ID must be a valid UUID."
+
+### Requirement: Upgrade documentation
+The README SHALL contain an "Upgrading from v2 to v3" section listing every breaking change with the edit a consumer makes.
+
+#### Scenario: Section present
+- **WHEN** the README is read
+- **THEN** each removed input and output, the `kubeconfig` type change and the pool tag merge appear with their edit
