@@ -1,7 +1,7 @@
 # AGENTS.md — terraform-modules-scaleway-kubernetes
 
 ## Project
-OpenTofu/Terraform module: a Scaleway Kapsule/Multicloud Kubernetes cluster with its node pools. Published on GitLab at leminnov/terraform/modules/scaleway-kubernetes;
+OpenTofu (>= 1.11.0) and Terraform (>= 1.11.0) module: a Scaleway Kapsule/Multicloud Kubernetes cluster with its node pools. Published on GitLab at leminnov/terraform/modules/scaleway-kubernetes;
 consumers pin a git tag. Planning uses OpenSpec (`openspec/`). Engineering
 standards live in the `quality`, `repository` and `terraform` OpenSpec stores, the single
 source of truth; this file only routes to them.
@@ -65,7 +65,7 @@ Never deviate silently: add a `# DEVIATION(<spec-id>): <reason>` comment and lis
 in your summary.
 
 ## Commands
-- Format / validate: `tofu fmt -recursive`, `tofu init -backend=false && tofu validate`, `tflint --recursive`
+- Format / validate: `tofu fmt -recursive`, `tofu init -backend=false && tofu validate`, `terraform init -backend=false && terraform validate`, `tflint --recursive`
 - Tests: `tofu test` (unit tests in `tests/main.tftest.hcl`, mock provider, no server)
 - Everything incl. README regeneration: `pre-commit run -a`; changelog: `mise run changelog`
 - Specs: `mise run spec-validate`; standards stores: `mise run spec-setup`

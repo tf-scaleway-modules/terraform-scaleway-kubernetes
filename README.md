@@ -5,7 +5,7 @@
 [![Scaleway Provider][scaleway-badge]][scaleway-url]
 [![Latest Release][release-badge]][release-url]
 
-A production-ready Terraform module for creating and managing **Scaleway Kapsule** Kubernetes clusters with comprehensive configuration options.
+A production-ready Terraform module for creating and managing **Scaleway Kapsule** Kubernetes clusters with comprehensive configuration options. It works with OpenTofu >= 1.11.0 and Terraform >= 1.11.0.
 
 ## Features
 
@@ -21,6 +21,10 @@ A production-ready Terraform module for creating and managing **Scaleway Kapsule
 - **API Server Access Control**: Optional allow-list (`api_server_acl`) of CIDRs or Scaleway ranges, or full isolation
 - **Pool Private Network**: Optional per-pool `private_network_id` to attach a pool to another Private Network of the cluster's VPC
 - **Independent Pool Upgrades**: Set `upgrade_pools = false` and pin `node_pools[*].version` to upgrade pools separately from the cluster
+
+## Upgrading from v3 to v4
+
+Consumers need OpenTofu or Terraform >= 1.11.0: `required_version` was raised from `>= 1.10.0`. Nothing else changes (inputs, outputs, state and the `~> 2.89` provider floor are unchanged). Rollback: pin the previous v3 tag.
 
 ## Upgrading from v2 to v3
 
@@ -93,7 +97,7 @@ Set either `no_ip_allowed = true` (full isolation) or `rules`, each with a `desc
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.10.0 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.11.0 |
 | <a name="requirement_scaleway"></a> [scaleway](#requirement\_scaleway) | ~> 2.89 |
 
 ## Providers
@@ -191,7 +195,7 @@ This module is provided "as is" without warranty of any kind, express or implied
 [apache]: https://opensource.org/licenses/Apache-2.0
 [apache-shield]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
 
-[terraform-badge]: https://img.shields.io/badge/Terraform-%3E%3D1.10-623CE4
+[terraform-badge]: https://img.shields.io/badge/Terraform-%3E%3D1.11-623CE4
 [terraform-url]: https://www.terraform.io
 
 [scaleway-badge]: https://img.shields.io/badge/Scaleway%20Provider-~%3E2.89-4f0599
