@@ -17,7 +17,7 @@ references:
     ref: v4.1.0
   - id: terraform
     remote: https://gitlab.com/leminnov/agentic-coding/openspec/terraform.git
-    ref: v1.2.6
+    ref: v2.1.0
 
 context: |
   Quality mandate: every artifact applies the non-negotiables of AGENTS.md
@@ -30,7 +30,7 @@ context: |
   gitlab.com/leminnov/terraform/modules/scaleway-kubernetes; consumers pin
   it with ?ref=vX.Y.Z. License: Apache-2.0.
 
-  Stack: HCL only. required_version >= 1.10.0. Providers pinned with ~> in
+  Stack: HCL only. required_version >= 1.11.0. Providers pinned with ~> in
   versions.tf: scaleway/scaleway ~> 2.89. Every tool is pinned in mise.toml.
 
   Layout: one .tf file per theme at the repository root: main.tf (cluster and

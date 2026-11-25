@@ -178,7 +178,7 @@ variable "auto_upgrade" {
 }
 
 variable "upgrade_pools" {
-  description = "Upgrade node pools together with the cluster (provider default: true). Set to false to upgrade each pool separately via node_pools[*].version."
+  description = "Upgrade node pools together with the cluster (provider default: `true`). Set to `false` to upgrade each pool separately through the `version` attribute of each `node_pools` entry."
   type        = bool
   default     = null
 }
@@ -201,7 +201,7 @@ variable "autoscaler_config" {
     scale_down_utilization_threshold = optional(number, 0.5)
     max_graceful_termination_sec     = optional(number, 600)
     skip_nodes_with_local_storage    = optional(bool)
-    log_level                        = optional(number) # 0 (least verbose) to 4
+    log_level                        = optional(number)
   })
   default = null
 
@@ -254,24 +254,20 @@ variable "oidc_config" {
 ################################################################################
 
 variable "node_pools" {
-  description = "Map of node pool configurations. The map key is used as the pool name."
+  description = "Map of node pools to create, keyed by the pool name. See Input reference in the README for every attribute."
   type = map(object({
-    # Required
     node_type = string
     size      = number
 
-    # Scaling
     min_size    = optional(number)
     max_size    = optional(number)
     autoscaling = optional(bool, false)
     autohealing = optional(bool, true)
 
-    # Runtime
     container_runtime = optional(string, "containerd")
     kubelet_args      = optional(map(string), {})
-    user_data         = optional(map(string), {}) # key => content ("cloud-init" key is reserved)
+    user_data         = optional(map(string), {})
 
-    # Kubernetes node metadata (taints: reconciled; startup_taints: applied at node creation only)
     labels = optional(map(string), {})
     taints = optional(list(object({
       key    = string
@@ -284,25 +280,20 @@ variable "node_pools" {
       effect = string
     })), [])
 
-    # Placement
     placement_group_id = optional(string)
     zone               = optional(string)
 
-    # Storage
     root_volume_type       = optional(string)
     root_volume_size_in_gb = optional(number)
 
-    # Network
     public_ip_disabled = optional(bool, false)
-    private_network_id = optional(string) # region/uuid; null = the cluster's Private Network. Changing it replaces the pool.
-    security_group_id  = optional(string) # null = Scaleway-managed group; a custom group must allow node registration and Kubernetes traffic or nodes never become ready
+    private_network_id = optional(string)
+    security_group_id  = optional(string)
 
-    # Metadata
-    tags = optional(list(string), []) # merged with the module tags
+    tags = optional(list(string), [])
 
-    # Lifecycle
     wait_for_pool_ready = optional(bool, true)
-    version             = optional(string) # only honored when upgrade_pools = false
+    version             = optional(string)
     upgrade_policy = optional(object({
       max_unavailable = optional(number, 1)
       max_surge       = optional(number, 0)
@@ -407,7 +398,7 @@ variable "node_pools" {
 ################################################################################
 
 variable "api_server_acl" {
-  description = "API server allow-list. Set either no_ip_allowed = true (full isolation) or rules (each with a description and exactly one of ip, a CIDR, or scaleway_ranges = true). Null creates no ACL and keeps the provider default (allow all). WARNING: the API server then refuses every caller outside the rules, including the machine that runs tofu apply; include the CI/runner egress CIDR. Setting it back to null restores allow-all."
+  description = "API server allow-list: set either `no_ip_allowed = true` (full isolation) or `rules`. `null` creates no ACL and keeps the provider default (allow all). The API server refuses callers outside the rules, including the machine that runs apply; see Input reference in the README."
   type = object({
     no_ip_allowed = optional(bool, false)
     rules = optional(list(object({
