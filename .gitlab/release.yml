@@ -5,7 +5,7 @@
 validate:opentofu:
   stage: validate
   image:
-    name: ghcr.io/opentofu/opentofu:1.11
+    name: ghcr.io/opentofu/opentofu:1.13.10
     entrypoint: [""]
   rules:
     - when: always
@@ -16,6 +16,18 @@ validate:opentofu:
   cache:
     paths:
       - .terraform
+
+validate:terraform:
+  stage: validate
+  image:
+    name: hashicorp/terraform:1.17.2
+    entrypoint: [""]
+  rules:
+    - when: always
+  script:
+    - terraform init -backend=false
+    - terraform validate
+    - for d in examples/*/; do (cd "$d" && terraform init -backend=false && terraform validate) || exit 1; done
 
 validate:tflint:
   stage: validate
@@ -75,6 +87,7 @@ create:release:
   needs:
     - pre-commit
     - validate:opentofu
+    - validate:terraform
     - validate:tflint
     - verify:changelog
   before_script:
