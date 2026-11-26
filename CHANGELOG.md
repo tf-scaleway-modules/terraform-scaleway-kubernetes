@@ -12,6 +12,7 @@ Pin opentofu 1.13.10 and terraform 1.17.2, add the validate:terraform
 CI job to the release needs, run the pre-commit Terraform hooks with
 tofu, and move the terraform standards store to v2.1.0.
 - Rewrite input and output descriptions as single-line prose so they render on the Terraform Registry
+## [3.0.0] - 2026-11-01
 - Add cluster network CIDRs and pool security groups, replace the project lookup with project_id and trim kubeconfig outputs
 
 BREAKING: v3.0.0.
@@ -30,6 +31,7 @@ BREAKING: v3.0.0.
   and node IDs and private IPs in the node_pools output.
 
 See "Upgrading from v2 to v3" in the README.
+## [2.0.0] - 2026-10-31
 - Require Scaleway provider ~> 2.89, add pool private networks and an API server ACL
 
 Raise the provider floor from ~> 2.86 to ~> 2.89 because
@@ -49,6 +51,7 @@ Upgrade notes:
 - api_server_acl can lock out the machine that runs tofu apply; include the
   CI/runner egress CIDR.
 - user_data is stored in state: do not put secrets in it.
+## [1.2.2] - 2026-10-28
 - Reject reserved cloud-init user_data key and warn on ignored pool versions
 
 - Reject the cloud-init key in node_pools[*].user_data, which the provider reserves.
@@ -59,6 +62,7 @@ Upgrade notes:
 No upgrade action needed.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+## [1.2.1] - 2026-10-28
 - Key the pre-commit cache on mise.toml and .pre-commit-config.yaml
 
 The cache was keyed on the branch, so a branch kept tools installed by the previous mise, which the new one no longer puts on PATH (tofu not found). Keying it on the files that define the toolchain, as in scaleway-compute and scaleway-storage, starts a fresh cache whenever the toolchain changes and shares it across branches and tags.
@@ -82,6 +86,7 @@ spec-validate and spec-setup tasks, and the validate:specs CI job runs
 openspec validate --all --strict. The module contract is unchanged.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+## [1.2.0] - 2026-10-14
 - feat: support pool labels, taints, user data and independent pool upgrades
 
 - node_pools: add labels, taints, startup_taints, user_data and version.
@@ -93,6 +98,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 - rollback
 - fix organization id as data
+## [1.1.0] - 2025-12-25
 - Updates Scaleway provider version
 
 Updates the required Scaleway provider version in README.md to a more flexible range (~> 2.64).
