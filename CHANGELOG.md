@@ -2,6 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
+
 ## [4.0.0] - 2026-11-25
 - Require OpenTofu or Terraform 1.11.0 and validate with both tools
 
@@ -133,4 +134,3 @@ This change streamlines cluster creation, configuration, and node pool managemen
 - run pre commit
 - create scw kapsule module
 - Initial commit
-
